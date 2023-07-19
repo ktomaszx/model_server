@@ -15,6 +15,9 @@
 //*****************************************************************************
 #include "server.hpp"
 
+#define PY_SSIZE_T_CLEAN
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -51,6 +54,10 @@
 #include "servablemanagermodule.hpp"
 #include "stringutils.hpp"
 #include "version.hpp"
+
+#include <pybind11/embed.h> // everything needed for embedding
+namespace py = pybind11;
+using namespace py::literals;
 
 using grpc::ServerBuilder;
 
@@ -227,6 +234,8 @@ void Server::setShutdownRequest(int i) {
 
 Server::~Server() {
     this->shutdownModules();
+    // Deinitialize Python interpreter for Python CN execution
+    Py_Finalize();
 }
 
 std::unique_ptr<Module> Server::createModule(const std::string& name) {
@@ -338,6 +347,10 @@ static int statusToExitCode(const Status& status) {
 
 // OVMS Start
 int Server::start(int argc, char** argv) {
+    // Initialize Python interpreter for Python CN execution
+    py::scoped_interpreter guard{}; // start the interpreter and keep it alive
+    py::gil_scoped_release release; // GIL only needed in Python custom node
+
     installSignalHandlers();
     CLIParser parser;
     ServerSettingsImpl serverSettings;

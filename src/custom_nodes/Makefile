@@ -55,3 +55,17 @@ endif
 	@rm install_opencv.sh
 	@rm opencv_cmake_flags.txt
 	@rm custom_node_interface.h
+
+python:
+	@cp $(HEADER_FILE_PATH) .
+	@cp $(OPENCV_BUILD_FLAGS) .
+	@cp $(OPENCV_INSTALL_SCRIPT) .
+	@cp -r ../queue.hpp ./queue.hpp
+	@docker build  -f Dockerfile_python.ubuntu -t custom_node_build_image:latest --build-arg http_proxy=${http_proxy} --build-arg https_proxy=${https_proxy} --build-arg no_proxy=${no_proxy} --build-arg BASE_IMAGE=$(BASE_IMAGE) . || exit 1
+	@mkdir -p ./lib/$(BASE_OS)
+	@docker cp $$(docker create --rm custom_node_build_image:latest):/custom_nodes/lib/libcustom_node_python_executor.so ./lib/$(BASE_OS)/ || exit 1
+	@echo "Built python custom node"
+	@rm ./queue.hpp
+	@rm install_opencv.sh
+	@rm opencv_cmake_flags.txt
+	@rm custom_node_interface.h

@@ -62,6 +62,8 @@ cc_library(
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
 load("@tensorflow_serving//tensorflow_serving:serving.bzl", "serving_tensorflow_proto_dep")
 
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+
 cc_shared_library(
     name = "ovms_shared",
     dynamic_deps = [],
@@ -396,7 +398,6 @@ cc_library(
     copts = [
         "-Wall",
         "-Wno-unknown-pragmas",
-        "-Werror",
     ],
     visibility = [
         "//visibility:public",
@@ -445,6 +446,20 @@ cc_binary(
     srcs = [
 	    "test/custom_nodes/node_add_sub.c",
 	    "custom_node_interface.h",
+    ],
+    linkshared = 1,
+)
+
+cc_binary(
+    name = "lib_python_executor.so",
+    srcs = [
+	    "test/custom_nodes/python_executor.cpp",
+	    "custom_node_interface.h",
+    ],
+    deps = [
+        "@python_linux//:python38-lib",
+        "@numpy-headers//:headers",
+        "@pybind11//:pybind11_embed",
     ],
     linkshared = 1,
 )

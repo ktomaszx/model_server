@@ -32,6 +32,8 @@
 #include "nodeinputhandler.hpp"
 #include "pipelineeventqueue.hpp"
 
+#include <Python.h>
+
 namespace ovms {
 
 CustomNodeSession::CustomNodeSession(const NodeSessionMetadata& metadata, const std::string& nodeName, uint32_t inputsCount, const CollapseDetails& collapsingDetails) :

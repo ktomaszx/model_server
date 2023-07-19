@@ -17,7 +17,9 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 #include <iostream>
+#include <thread>
 #include <cstring>
+#include <map>
 
 #include "../../custom_node_interface.h"
 
@@ -28,6 +30,7 @@ static constexpr const char* INPUT_TENSOR_NAME = "input";
 static constexpr const char* OUTPUT_TENSOR_NAME = "output";
 
 int initialize(void** customNodeLibraryInternalManager, const struct CustomNodeParam* params, int paramsCount) {
+    import_array();
     return 0;
 }
 
@@ -37,17 +40,19 @@ int deinitialize(void* customNodeLibraryInternalManager) {
 
 int execute(const struct CustomNodeTensor* inputs, int inputsCount, struct CustomNodeTensor** outputs, int* outputsCount, const struct CustomNodeParam* params, int paramsCount, void* customNodeLibraryInternalManager) {
 
-    Py_Initialize();
-    import_array();
+    std::thread::id this_id = std::this_thread::get_id();
+    // Inputs reading
 
-        // Inputs reading
     const CustomNodeTensor* inputTensor = nullptr;
     inputTensor = &(inputs[0]);
-
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+    std::cout << "\nGIL acquired for custom logic execution [Thread ID:" << this_id << "]\n";
+    
     npy_intp dims [inputTensor->dimsCount];
 
     for (uint64_t i = 0; i < inputTensor->dimsCount; i++) {
-        dims[i] = (int32_t) inputTensor->dims[0];
+        dims[i] = (int32_t) inputTensor->dims[i];
     } 
 
     PyObject *ndarray = PyArray_SimpleNewFromData(inputTensor->dimsCount, dims, NPY_INT, reinterpret_cast<void*>(inputTensor->data));
@@ -60,11 +65,11 @@ int execute(const struct CustomNodeTensor* inputs, int inputsCount, struct Custo
     PyObject *name, *load_module, *func;
 
     name = PyUnicode_FromString((char*)"script");
-
     load_module = PyImport_Import(name);
-
     func = PyObject_GetAttrString(load_module, (char*)"execute");
+
     PyObject *retDict = PyObject_CallFunctionObjArgs(func, dict, NULL);
+    
     PyObject *retOutput = PyDict_GetItemString(retDict, "output");
     PyArrayObject* np_ret = reinterpret_cast<PyArrayObject*>(retOutput);
 
@@ -76,9 +81,11 @@ int execute(const struct CustomNodeTensor* inputs, int inputsCount, struct Custo
     // Preparing output tensor
     uint64_t byteSize = sizeof(int) *  5;
     int* buffer = (int*)malloc(byteSize);
-    NODE_ASSERT(buffer != nullptr, "malloc has failed");
 
     std::memcpy((uint8_t*)buffer, c_out, byteSize);
+    
+    PyGILState_Release(gstate);
+    std::cout << "\nGIL released after custom logic execution [Thread ID:" << this_id << "]\n";
 
     *outputsCount = 1;
     *outputs = (struct CustomNodeTensor*)malloc(*outputsCount * sizeof(CustomNodeTensor));
@@ -94,23 +101,17 @@ int execute(const struct CustomNodeTensor* inputs, int inputsCount, struct Custo
     output.dataBytes = byteSize;
     output.dimsCount = 1;
     output.dims = (uint64_t*)malloc(output.dimsCount * sizeof(uint64_t));
-    NODE_ASSERT(output.dims != nullptr, "malloc has failed");
     output.dims[0] = 5;
     output.precision = I32;
-
-    Py_Finalize();
     return 0;
 }
 
 int getInputsInfo(struct CustomNodeTensorInfo** info, int* infoCount, const struct CustomNodeParam* params, int paramsCount, void* customNodeLibraryInternalManager) {
     *infoCount = 1;
     *info = (struct CustomNodeTensorInfo*)malloc(*infoCount * sizeof(struct CustomNodeTensorInfo));
-    NODE_ASSERT((*info) != nullptr, "malloc has failed");
-
     (*info)[0].name = "input";
     (*info)[0].dimsCount = 1;
     (*info)[0].dims = (uint64_t*)malloc((*info)[0].dimsCount * sizeof(uint64_t));
-    NODE_ASSERT(((*info)[0].dims) != nullptr, "malloc has failed");
     (*info)[0].dims[0] = 5;
     (*info)[0].precision = I32;
     return 0;
@@ -119,12 +120,9 @@ int getInputsInfo(struct CustomNodeTensorInfo** info, int* infoCount, const stru
 int getOutputsInfo(struct CustomNodeTensorInfo** info, int* infoCount, const struct CustomNodeParam* params, int paramsCount, void* customNodeLibraryInternalManager) {
     *infoCount = 1;
     *info = (struct CustomNodeTensorInfo*)malloc(*infoCount * sizeof(struct CustomNodeTensorInfo));
-    NODE_ASSERT((*info) != nullptr, "malloc has failed");
-
     (*info)[0].name = "output";
     (*info)[0].dimsCount = 1;
     (*info)[0].dims = (uint64_t*)malloc((*info)->dimsCount * sizeof(uint64_t));
-    NODE_ASSERT(((*info)[0].dims) != nullptr, "malloc has failed");
     (*info)[0].dims[0] = 5;
     (*info)[0].precision = I32;
 

@@ -173,6 +173,52 @@ new_local_repository(
 
 ########################################################### Mediapipe end
 
+
+################################# Python Custom Nodes Support start
+
+new_local_repository(
+    name = "python_linux",
+    path = "/usr",
+    build_file_content = """
+cc_library(
+    name = "python38-lib",
+    srcs = ["lib/python3.8/config-3.8-x86_64-linux-gnu/libpython3.8.so"],
+    hdrs = glob(["include/python3.8/*.h"]),
+    includes = ["include/python3.8"],
+    visibility = ["//visibility:public"]
+)
+    """
+)
+
+new_local_repository(
+    name = "numpy-headers",
+    path = "/usr/local/lib/python3.8/dist-packages/numpy/core/include",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "headers",
+    hdrs = glob(["**/*.h"]),
+)
+"""
+)
+
+http_archive(
+  name = "pybind11_bazel",
+  strip_prefix = "pybind11_bazel-b162c7c88a253e3f6b673df0c621aca27596ce6b",
+  urls = ["https://github.com/pybind/pybind11_bazel/archive/b162c7c88a253e3f6b673df0c621aca27596ce6b.zip"],
+)
+# We still require the pybind library.
+http_archive(
+  name = "pybind11",
+  build_file = "@pybind11_bazel//:pybind11.BUILD",
+  strip_prefix = "pybind11-2.10.4",
+  urls = ["https://github.com/pybind/pybind11/archive/v2.10.4.tar.gz"],
+)
+load("@pybind11_bazel//:python_configure.bzl", "python_configure")
+python_configure(name = "local_config_python")
+
+################################# Python Custom Nodes Support end
+
 # minitrace
 new_git_repository(
     name = "minitrace",
