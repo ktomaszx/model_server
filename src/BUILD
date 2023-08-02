@@ -368,6 +368,7 @@ cc_library(
                 "mediapipe_internal/mediapipegraphexecutor.hpp",
                 "mediapipe_internal/packettypes.hpp",
                 "mediapipe_calculators/ovms_calculator.cc",
+                "mediapipe_calculators/python_backend_calculator.cc",
             ],
             "//src:disable_mediapipe" : [],
         }),
