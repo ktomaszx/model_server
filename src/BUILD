@@ -75,6 +75,8 @@ cc_library(
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
 load("@tensorflow_serving//tensorflow_serving:serving.bzl", "serving_tensorflow_proto_dep")
 
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+
 cc_shared_library(
     name = "ovms_shared",
     dynamic_deps = [],
@@ -373,6 +375,8 @@ cc_library(
             "//src:disable_mediapipe" : [],
         }),
     deps = [
+        "@python_linux//:python38-lib",
+        "@pybind11//:pybind11_embed",
         "//:ovms_dependencies",
         "//src/kfserving_api:kfserving_api_cpp",
         ] + select({

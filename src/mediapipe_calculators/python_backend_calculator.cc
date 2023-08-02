@@ -17,6 +17,11 @@
 
 #include "mediapipe/framework/calculator_framework.h"
 
+#include <pybind11/embed.h> // everything needed for embedding
+
+namespace py = pybind11;
+using namespace py::literals;
+
 namespace mediapipe {
 
 class PythonBackendCalculator : public CalculatorBase {
@@ -40,6 +45,14 @@ public:
     absl::Status Process(CalculatorContext* cc) final {
         LOG(ERROR) << "PythonBackendCalculator::Process";
 
+        py::gil_scoped_acquire acquire;
+        py::print("PYTHON: Acquired GIL");
+        py::exec(R"(
+            import time
+            time.sleep(2)
+            print('slept for 2s')
+        )");
+
         ov::Tensor in_tensor = cc->Inputs().Index(0).Get<ov::Tensor>();
 
         auto* out_tensor = new ov::Tensor(in_tensor.get_element_type(), in_tensor.get_shape());
@@ -52,6 +65,7 @@ public:
 
         cc->Outputs().Index(0).Add(out_tensor, cc->InputTimestamp());
 
+        py::print("PYTHON: Released GIL");
         return absl::OkStatus();
     }
 };
