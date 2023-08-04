@@ -15,8 +15,27 @@
 #
 input_stream: "in"
 output_stream: "out"
+output_stream: "out2"
+
 node {
   calculator: "PythonBackendCalculator"
+  input_side_packet: "PYOBJECT:pyobject"
   input_stream: "in"
   output_stream: "out"
+  node_options: {
+    [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+      handler_path: "/ovms/script.py"
+    }
+  }
+}
+node {
+  calculator: "PythonBackendCalculator"
+  input_side_packet: "PYOBJECT:pyobject"
+  input_stream: "in"
+  output_stream: "out2"
+  node_options: {
+    [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+      handler_path: "/ovms/script.py"
+    }
+  }
 }

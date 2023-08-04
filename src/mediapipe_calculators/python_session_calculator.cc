@@ -25,51 +25,41 @@ using namespace py::literals;
 
 namespace mediapipe {
 
-class PythonBackendCalculator : public CalculatorBase {
-    py::object pyobjectClass;
+class PythonSessionCalculator : public CalculatorBase {
+    std::shared_ptr<PyObjectClass> pyobjectClass;
 public:
     static absl::Status GetContract(CalculatorContract* cc) {
-        LOG(ERROR) << "PythonBackendCalculator::GetContract";
-        cc->Inputs().Index(0).Set<ov::Tensor>();
-        cc->Outputs().Index(0).Set<ov::Tensor>();
-        cc->InputSidePackets().Tag("PYOBJECT").Set<py::object>();
+        LOG(ERROR) << "PythonSessionCalculator::GetContract";
+        RET_CHECK(cc->Inputs().GetTags().empty());
+        RET_CHECK(cc->Outputs().GetTags().empty());
+        cc->OutputSidePackets().Tag("PYOBJECT").Set<std::shared_ptr<PyObjectClass>>();
         return absl::OkStatus();
     }
 
     absl::Status Close(CalculatorContext* cc) final {
-        LOG(ERROR) << "PythonBackendCalculator::Close";
+        LOG(ERROR) << "PythonSessionCalculator::Close";
         return absl::OkStatus();
     }
     absl::Status Open(CalculatorContext* cc) final {
-        LOG(ERROR) << "PythonBackendCalculator::Open";
-        pyobjectClass = cc->InputSidePackets().Tag("PYOBJECT").Get<py::object>();
+        LOG(ERROR) << "PythonSessionCalculator::Open";
+        auto session = std::make_shared<PyObjectClass>();
+        py::gil_scoped_acquire acquire;
+        py::print("PYTHON SESSION: Acquired GIL");
+        py::exec(R"(
+            import time
+            time.sleep(2)
+            print('slept for 2s')
+        )");
+        cc->OutputSidePackets().Tag("PYOBJECT").Set(MakePacket<std::shared_ptr<PyObjectClass>>(session));
         return absl::OkStatus();
     }
 
     absl::Status Process(CalculatorContext* cc) final {
-        LOG(ERROR) << "PythonBackendCalculator::Process";
-
-        py::gil_scoped_acquire acquire;
-        py::print("PYTHON: Acquired GIL");
-        pyobjectClass.attr("execute")();
-
-        ov::Tensor in_tensor = cc->Inputs().Index(0).Get<ov::Tensor>();
-
-        auto* out_tensor = new ov::Tensor(in_tensor.get_element_type(), in_tensor.get_shape());
-        std::memcpy(out_tensor->data(), in_tensor.data(), in_tensor.get_byte_size());
-
-        for (int i = 0; i < 10; i++) {
-            float* pV = ((float*)out_tensor->data()) + i;
-            *pV += 1.0f;
-        }
-
-        cc->Outputs().Index(0).Add(out_tensor, cc->InputTimestamp());
-
-        py::print("PYTHON: Released GIL");
+        LOG(ERROR) << "PythonSessionCalculator::Process";
         return absl::OkStatus();
     }
 };
 
-REGISTER_CALCULATOR(PythonBackendCalculator);
+REGISTER_CALCULATOR(PythonSessionCalculator);
 
 }  // namespace mediapipe

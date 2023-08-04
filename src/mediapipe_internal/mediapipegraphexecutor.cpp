@@ -37,6 +37,7 @@
 #include "../tfs_frontend/tfs_utils.hpp"
 #include "../timer.hpp"
 #include "../version.hpp"
+#include "src/mediapipe_calculators/python_backend_calculator.pb.h"
 #include "mediapipe/framework/calculator_graph.h"
 #include "mediapipe/framework/port/status.h"
 #include "mediapipegraphdefinition.hpp"  // for version in response
@@ -161,14 +162,18 @@ static Status deserializeTensor(const std::string& requestedName, const KFSReque
 MediapipeGraphExecutor::MediapipeGraphExecutor(const std::string& name, const std::string& version, const ::mediapipe::CalculatorGraphConfig& config,
     stream_types_mapping_t inputTypes,
     stream_types_mapping_t outputTypes,
-    std::vector<std::string> inputNames, std::vector<std::string> outputNames) :
+    std::vector<std::string> inputNames, std::vector<std::string> outputNames,
+    py::object userPythonObject) :
     name(name),
     version(version),
     config(config),
     inputTypes(std::move(inputTypes)),
     outputTypes(std::move(outputTypes)),
     inputNames(std::move(inputNames)),
-    outputNames(std::move(outputNames)) {}
+    outputNames(std::move(outputNames)),
+    userPythonObject(userPythonObject) {
+        SPDLOG_INFO("MediapipeGraphExecutor constructor");
+    }
 
 namespace {
 enum : unsigned int {
@@ -366,6 +371,7 @@ Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* res
     }
 
     std::map<std::string, mediapipe::Packet> inputSidePackets{createInputSidePackets(request)};
+    inputSidePackets["pyobject"] = mediapipe::MakePacket<py::object>(this->userPythonObject).At(mediapipe::Timestamp(0));
     absStatus = graph.StartRun(inputSidePackets);
     if (!absStatus.ok()) {
         const std::string absMessage = absStatus.ToString();

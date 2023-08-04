@@ -27,6 +27,10 @@
 #include "mediapipe/framework/calculator_graph.h"
 #include "mediapipe/framework/port/status.h"
 #include "packettypes.hpp"
+#include <pybind11/embed.h> // everything needed for embedding
+#include <filesystem>
+
+namespace py = pybind11;
 
 namespace ovms {
 class Status;
@@ -39,12 +43,14 @@ class MediapipeGraphExecutor {
     stream_types_mapping_t outputTypes;
     const std::vector<std::string> inputNames;
     const std::vector<std::string> outputNames;
+    py::object userPythonObject;
 
 public:
     MediapipeGraphExecutor(const std::string& name, const std::string& version, const ::mediapipe::CalculatorGraphConfig& config,
         stream_types_mapping_t inputTypes,
         stream_types_mapping_t outputTypes,
-        std::vector<std::string> inputNames, std::vector<std::string> outputNames);
+        std::vector<std::string> inputNames, std::vector<std::string> outputNames,
+        py::object userPythonObject);
     Status infer(const KFSRequest* request, KFSResponse* response, ExecutionContext executionContext, ServableMetricReporter*& reporterOut) const;
 };
 }  // namespace ovms

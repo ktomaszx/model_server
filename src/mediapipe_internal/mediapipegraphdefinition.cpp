@@ -36,9 +36,14 @@
 #include "../tensorinfo.hpp"
 #include "../timer.hpp"
 #include "../version.hpp"
+#include "src/mediapipe_calculators/python_backend_calculator.pb.h"
 #include "mediapipe/framework/port/parse_text_proto.h"
 #include "mediapipe/framework/port/status.h"
 #include "mediapipegraphexecutor.hpp"
+#include <pybind11/embed.h> // everything needed for embedding
+#include <filesystem>
+
+namespace py = pybind11;
 
 namespace ovms {
 MediapipeGraphConfig MediapipeGraphDefinition::MGC;
@@ -126,6 +131,31 @@ Status MediapipeGraphDefinition::validate(ModelManager& manager) {
     return StatusCode::OK;
 }
 
+void MediapipeGraphDefinition::initializeNodes() {
+    SPDLOG_INFO("MediapipeGraphDefinition initializing graph nodes");
+    for (int i = 0; i < config.node().size(); i++){
+        if (config.node(i).node_options().size()) {
+            mediapipe::PythonBackendCalculatorOptions options;
+            config.node(i).node_options(0).UnpackTo(&options);
+            const std::string handler_path = options.handler_path();
+            auto handler_path2 = std::filesystem::path(handler_path);
+            handler_path2.replace_extension();
+
+            std::string parent_path = handler_path2.parent_path();
+            std::string filename = handler_path2.filename();
+
+            py::gil_scoped_acquire acquire;
+            py::module_ sys = py::module_::import("sys");
+            sys.attr("path").attr("append")(parent_path.c_str());
+            py::module_ script = py::module_::import(filename.c_str());
+            py::object OvmsPythonModel = script.attr("OvmsPythonModel");
+            py::object model_instance = OvmsPythonModel();
+            model_instance.attr("initialize")();
+            this->userPythonObject = model_instance;
+        }
+    }
+}
+
 MediapipeGraphDefinition::MediapipeGraphDefinition(const std::string name,
     const MediapipeGraphConfig& config,
     MetricRegistry* registry,
@@ -188,7 +218,7 @@ Status MediapipeGraphDefinition::create(std::shared_ptr<MediapipeGraphExecutor>&
     SPDLOG_DEBUG("Creating Mediapipe graph executor: {}", getName());
 
     pipeline = std::make_shared<MediapipeGraphExecutor>(getName(), std::to_string(getVersion()),
-        this->config, this->inputTypes, this->outputTypes, this->inputNames, this->outputNames);
+        this->config, this->inputTypes, this->outputTypes, this->inputNames, this->outputNames, this->userPythonObject);
     return status;
 }
 

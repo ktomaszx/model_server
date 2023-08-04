@@ -26,7 +26,7 @@ import tritonclient.grpc as grpcclient
 
 if __name__ == '__main__':
     triton_client = grpcclient.InferenceServerClient(
-                url='localhost:11337',
+                url='localhost:9000',
                 verbose=True)
 
     inputs = []

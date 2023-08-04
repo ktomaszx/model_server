@@ -35,6 +35,10 @@
 #include "mediapipe/framework/port/status.h"
 #include "mediapipegraphconfig.hpp"
 #include "packettypes.hpp"
+#include <pybind11/embed.h> // everything needed for embedding
+#include <filesystem>
+
+namespace py = pybind11;
 
 namespace ovms {
 class MediapipeGraphDefinitionUnloadGuard;
@@ -70,6 +74,7 @@ public:
     Status reload(ModelManager& manager, const MediapipeGraphConfig& config);
     Status validate(ModelManager& manager);
     void retire(ModelManager& manager);
+    void initializeNodes();
 
     static constexpr uint64_t WAIT_FOR_LOADED_DEFAULT_TIMEOUT_MICROSECONDS = 500000;
     static const std::string SCHEDULER_CLASS_NAME;
@@ -114,6 +119,8 @@ protected:
 
     MediapipeGraphConfig mgconfig;
     ::mediapipe::CalculatorGraphConfig config;
+    
+    py::object userPythonObject;
 
     Status createInputsInfo();
     Status createOutputsInfo();
