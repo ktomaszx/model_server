@@ -156,6 +156,42 @@ void MediapipeGraphDefinition::initializeNodes() {
     }
 }
 
+Status MediapipeGraphDefinition::initializeGraph() {
+    SPDLOG_DEBUG("Initializing graph");
+    auto absStatus = graph.Initialize(this->config);
+    if (!absStatus.ok()) {
+        const std::string absMessage = absStatus.ToString();
+        SPDLOG_DEBUG("Iinitialization failed with message: {}", absMessage);
+        return Status(StatusCode::MEDIAPIPE_GRAPH_INITIALIZATION_ERROR, std::move(absMessage));
+    }
+
+    for (auto& name : this->outputNames) {
+        if (name.empty()) {
+            SPDLOG_DEBUG("Creating Mediapipe graph outputs name failed for: {}", name);
+            return StatusCode::MEDIAPIPE_GRAPH_ADD_OUTPUT_STREAM_ERROR;
+        }
+        auto absStatusOrPoller = graph.AddOutputStreamPoller(name);
+        if (!absStatusOrPoller.ok()) {
+            const std::string absMessage = absStatusOrPoller.status().ToString();
+            SPDLOG_DEBUG("Failed to add mediapipe graph output stream poller with error: {}", absMessage);
+            return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_OUTPUT_STREAM_ERROR, std::move(absMessage));
+        }
+        outputPollers.emplace(name, std::move(absStatusOrPoller).value());
+    }
+
+    std::map<std::string, mediapipe::Packet> inputSidePackets{};
+    inputSidePackets["pyobject"] = mediapipe::MakePacket<py::object>(this->userPythonObject).At(mediapipe::Timestamp(0));
+    SPDLOG_DEBUG("Starting graph");
+    absStatus = graph.StartRun(inputSidePackets);
+    if (!absStatus.ok()) {
+        const std::string absMessage = absStatus.ToString();
+        SPDLOG_DEBUG("Failed to start mediapipe graph with error: {}", absMessage);
+        return Status(StatusCode::MEDIAPIPE_GRAPH_START_ERROR, std::move(absMessage));
+    }
+    return StatusCode::OK;
+
+}
+
 MediapipeGraphDefinition::MediapipeGraphDefinition(const std::string name,
     const MediapipeGraphConfig& config,
     MetricRegistry* registry,
@@ -218,7 +254,7 @@ Status MediapipeGraphDefinition::create(std::shared_ptr<MediapipeGraphExecutor>&
     SPDLOG_DEBUG("Creating Mediapipe graph executor: {}", getName());
 
     pipeline = std::make_shared<MediapipeGraphExecutor>(getName(), std::to_string(getVersion()),
-        this->config, this->inputTypes, this->outputTypes, this->inputNames, this->outputNames, this->userPythonObject);
+        this->config, this->inputTypes, this->outputTypes, this->inputNames, this->outputNames, this->userPythonObject, &this->graph, &this->outputPollers);
     return status;
 }
 

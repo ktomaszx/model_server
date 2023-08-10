@@ -75,6 +75,7 @@ public:
     Status validate(ModelManager& manager);
     void retire(ModelManager& manager);
     void initializeNodes();
+    Status initializeGraph();
 
     static constexpr uint64_t WAIT_FOR_LOADED_DEFAULT_TIMEOUT_MICROSECONDS = 500000;
     static const std::string SCHEDULER_CLASS_NAME;
@@ -121,6 +122,8 @@ protected:
     ::mediapipe::CalculatorGraphConfig config;
     
     py::object userPythonObject;
+    ::mediapipe::CalculatorGraph graph;
+    std::unordered_map<std::string, ::mediapipe::OutputStreamPoller> outputPollers;
 
     Status createInputsInfo();
     Status createOutputsInfo();

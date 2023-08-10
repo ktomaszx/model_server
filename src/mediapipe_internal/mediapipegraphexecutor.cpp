@@ -163,7 +163,8 @@ MediapipeGraphExecutor::MediapipeGraphExecutor(const std::string& name, const st
     stream_types_mapping_t inputTypes,
     stream_types_mapping_t outputTypes,
     std::vector<std::string> inputNames, std::vector<std::string> outputNames,
-    py::object userPythonObject) :
+    py::object userPythonObject, ::mediapipe::CalculatorGraph * graph,
+    std::unordered_map<std::string, ::mediapipe::OutputStreamPoller> * outputPollers) :
     name(name),
     version(version),
     config(config),
@@ -172,6 +173,8 @@ MediapipeGraphExecutor::MediapipeGraphExecutor(const std::string& name, const st
     inputNames(std::move(inputNames)),
     outputNames(std::move(outputNames)),
     userPythonObject(userPythonObject) {
+        this->graph = graph;
+        this->outputPollers = outputPollers;
         SPDLOG_INFO("MediapipeGraphExecutor constructor");
     }
 
@@ -187,6 +190,7 @@ enum : unsigned int {
 };
 }  // namespace
 
+/*
 static std::map<std::string, mediapipe::Packet> createInputSidePackets(const KFSRequest* request) {
     std::map<std::string, mediapipe::Packet> inputSidePackets;
     for (const auto& [name, valueChoice] : request->parameters()) {
@@ -202,7 +206,7 @@ static std::map<std::string, mediapipe::Packet> createInputSidePackets(const KFS
     }
     return inputSidePackets;
 }
-
+*/
 template <typename T>
 static Status createPacketAndPushIntoGraph(const std::string& name, const KFSRequest& request, ::mediapipe::CalculatorGraph& graph) {
     if (name.empty()) {
@@ -224,6 +228,7 @@ static Status createPacketAndPushIntoGraph(const std::string& name, const KFSReq
             name, request.model_name(), absStatus.message(), absStatus.raw_code());
         return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_PACKET_INPUT_STREAM, std::move(absMessage));
     }
+    /*
     absStatus = graph.CloseInputStream(name);
     if (!absStatus.ok()) {
         const std::string absMessage = absStatus.ToString();
@@ -231,6 +236,7 @@ static Status createPacketAndPushIntoGraph(const std::string& name, const KFSReq
             name, request.model_name(), absMessage);
         return Status(StatusCode::MEDIAPIPE_GRAPH_CLOSE_INPUT_STREAM_ERROR, std::move(absMessage));
     }
+    */
     return StatusCode::OK;
 }
 
@@ -249,6 +255,7 @@ Status createPacketAndPushIntoGraph<KFSRequest*>(const std::string& name, const 
             name, request.model_name(), absStatus.message(), absStatus.raw_code());
         return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_PACKET_INPUT_STREAM, std::move(absMessage));
     }
+    /*
     absStatus = graph.CloseInputStream(name);
     if (!absStatus.ok()) {
         const std::string absMessage = absStatus.ToString();
@@ -256,6 +263,7 @@ Status createPacketAndPushIntoGraph<KFSRequest*>(const std::string& name, const 
             name, request.model_name(), absMessage);
         return Status(StatusCode::MEDIAPIPE_GRAPH_CLOSE_INPUT_STREAM_ERROR, std::move(absMessage));
     }
+    */
     return StatusCode::OK;
 }
 
@@ -346,46 +354,7 @@ Status receiveAndSerializePacket<KFSResponse*>(::mediapipe::Packet& packet, KFSR
 
 Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* response, ExecutionContext executionContext, ServableMetricReporter*& reporterOut) const {
     Timer<TIMER_END> timer;
-    SPDLOG_DEBUG("Start KServe request mediapipe graph: {} execution", request->model_name());
-    ::mediapipe::CalculatorGraph graph;
-    auto absStatus = graph.Initialize(this->config);
-    if (!absStatus.ok()) {
-        const std::string absMessage = absStatus.ToString();
-        SPDLOG_DEBUG("KServe request for mediapipe graph: {} initialization failed with message: {}", request->model_name(), absMessage);
-        return Status(StatusCode::MEDIAPIPE_GRAPH_INITIALIZATION_ERROR, std::move(absMessage));
-    }
-
-    std::unordered_map<std::string, ::mediapipe::OutputStreamPoller> outputPollers;
-    for (auto& name : this->outputNames) {
-        if (name.empty()) {
-            SPDLOG_DEBUG("Creating Mediapipe graph outputs name failed for: {}", name);
-            return StatusCode::MEDIAPIPE_GRAPH_ADD_OUTPUT_STREAM_ERROR;
-        }
-        auto absStatusOrPoller = graph.AddOutputStreamPoller(name);
-        if (!absStatusOrPoller.ok()) {
-            const std::string absMessage = absStatusOrPoller.status().ToString();
-            SPDLOG_DEBUG("Failed to add mediapipe graph output stream poller: {} with error: {}", request->model_name(), absMessage);
-            return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_OUTPUT_STREAM_ERROR, std::move(absMessage));
-        }
-        outputPollers.emplace(name, std::move(absStatusOrPoller).value());
-    }
-
-    std::map<std::string, mediapipe::Packet> inputSidePackets{createInputSidePackets(request)};
-    inputSidePackets["pyobject"] = mediapipe::MakePacket<py::object>(this->userPythonObject).At(mediapipe::Timestamp(0));
-    absStatus = graph.StartRun(inputSidePackets);
-    if (!absStatus.ok()) {
-        const std::string absMessage = absStatus.ToString();
-        SPDLOG_DEBUG("Failed to start mediapipe graph: {} with error: {}", request->model_name(), absMessage);
-        return Status(StatusCode::MEDIAPIPE_GRAPH_START_ERROR, std::move(absMessage));
-    }
-    if (static_cast<int>(this->inputNames.size()) != request->inputs().size()) {
-        std::stringstream ss;
-        ss << "Expected: " << this->inputNames.size() << "; Actual: " << request->inputs().size();
-        const std::string details = ss.str();
-        SPDLOG_DEBUG("[servable name: {} version: {}] Invalid number of inputs - {}", request->model_name(), version, details);
-        return Status(StatusCode::INVALID_NO_OF_INPUTS, details);
-    }
-
+    
     ::mediapipe::Packet packet;
     std::set<std::string> outputPollersWithReceivedPacket;
 
@@ -396,25 +365,25 @@ Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* res
     for (auto& name : this->inputNames) {
         if (this->inputTypes.at(name) == mediapipe_packet_type_enum::KFS_REQUEST) {
             SPDLOG_DEBUG("Request processing KFS passthrough: {}", name);
-            status = createPacketAndPushIntoGraph<KFSRequest*>(name, *request, graph);
+            status = createPacketAndPushIntoGraph<KFSRequest*>(name, *request, *graph);
         } else if (this->inputTypes.at(name) == mediapipe_packet_type_enum::TFTENSOR) {
             SPDLOG_DEBUG("Request processing TF tensor: {}", name);
-            status = createPacketAndPushIntoGraph<tensorflow::Tensor>(name, *request, graph);
+            status = createPacketAndPushIntoGraph<tensorflow::Tensor>(name, *request, *graph);
         } else if ((this->inputTypes.at(name) == mediapipe_packet_type_enum::OVTENSOR) ||
                    (this->inputTypes.at(name) == mediapipe_packet_type_enum::UNKNOWN)) {
             SPDLOG_DEBUG("Request processing OVTensor: {}", name);
-            status = createPacketAndPushIntoGraph<ov::Tensor>(name, *request, graph);
+            status = createPacketAndPushIntoGraph<ov::Tensor>(name, *request, *graph);
         }
         if (!status.ok()) {
             return status;
         }
     }
     // receive outputs
-    for (auto& [outputStreamName, poller] : outputPollers) {
+    for (auto& [outputStreamName, poller] : *outputPollers) {
         size_t receivedOutputs = 0;
         SPDLOG_DEBUG("Will wait for output stream: {} packet", outputStreamName);
         // Size checked to be equal 1 at the beggining of the function
-        while (poller.Next(&packet)) {
+        if (poller.Next(&packet)) {
             SPDLOG_DEBUG("Received packet from output stream: {}", outputStreamName);
             if (this->outputTypes.at(outputStreamName) == mediapipe_packet_type_enum::KFS_RESPONSE) {
                 SPDLOG_DEBUG("Response processing packet type KFSPass name: {}", outputStreamName);
@@ -435,16 +404,18 @@ Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* res
         }
         SPDLOG_TRACE("Received all: {} packets for: {}", receivedOutputs, outputStreamName);
     }
-    absStatus = graph.WaitUntilDone();
+    /*
+    auto absStatus = graph->WaitUntilDone();
     if (!absStatus.ok()) {
         const std::string absMessage = absStatus.ToString();
         SPDLOG_DEBUG("Mediapipe failed to execute: {}", absMessage);
         return Status(StatusCode::MEDIAPIPE_EXECUTION_ERROR, absMessage);
     }
-    if (outputPollers.size() != outputPollersWithReceivedPacket.size()) {
+    if (outputPollers->size() != outputPollersWithReceivedPacket.size()) {
         SPDLOG_DEBUG("Mediapipe failed to execute. Failed to receive all output packets");
         return Status(StatusCode::MEDIAPIPE_EXECUTION_ERROR, "Unknown error during mediapipe execution");
     }
+    */
     SPDLOG_DEBUG("Received all output stream packets for graph: {}", request->model_name());
     response->set_model_name(request->model_name());
     response->set_id(request->id());
