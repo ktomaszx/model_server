@@ -42,6 +42,7 @@ public:
     }
     absl::Status Open(CalculatorContext* cc) final {
         LOG(ERROR) << "PythonBackendCalculator::Open";
+        LOG(ERROR) << "Python node name:" << cc->NodeName();
         pyobjectClass = cc->InputSidePackets().Tag("PYOBJECT").Get<py::object>();
         return absl::OkStatus();
     }
@@ -51,7 +52,14 @@ public:
 
         py::gil_scoped_acquire acquire;
         py::print("PYTHON: Acquired GIL");
-        pyobjectClass.attr("execute")();
+        //pyobjectClass.attr("execute")();
+
+        py::iterator = pyobjectClass.attr("execute")(inputs);
+        while (it != py::iterator::sentinel()) {
+            result = cast<PYOBJECT>(*it);
+            cc->Outputs().Index(0).Add(result, myTimestamp);
+            ++it;
+        }
 
         ov::Tensor in_tensor = cc->Inputs().Index(0).Get<ov::Tensor>();
 
@@ -63,7 +71,6 @@ public:
             *pV += 1.0f;
         }
 
-        cc->Outputs().Index(0).Add(out_tensor, cc->InputTimestamp());
 
         py::print("PYTHON: Released GIL");
         return absl::OkStatus();
@@ -71,5 +78,53 @@ public:
 };
 
 REGISTER_CALCULATOR(PythonBackendCalculator);
-
 }  // namespace mediapipe
+
+/*
+class PythonNodeState;
+class PythonSession
+class PYOBJECT;
+
+class PythonExecutorCalculator : public CalculatorBase {
+    PythonNodeState pythonNodeState;
+public:
+    static absl::Status GetContract(CalculatorContract* cc) {
+        ...
+        cc->Inputs().Index(0).Set<PYOBJECT>();
+        cc->Outputs().Index(0).Set<PYOBJECT>();
+        cc->InputSidePackets().Tag("PYSESSION").Set<PythonSession>();
+        ...
+        return absl::OkStatus();
+    }
+
+    absl::Status Close(CalculatorContext* cc) final {
+        ...
+        return absl::OkStatus();
+    }
+    absl::Status Open(CalculatorContext* cc) final {
+        ...
+        auto pythonSession = cc->InputSidePackets().Tag("PYSESSION").Get<PythonSession>();
+        this->pythonNodeState = pythonSession[cc->NodeName()];
+        ...
+        return absl::OkStatus();
+    }
+
+    absl::Status Process(CalculatorContext* cc) final {
+        ...
+        py::gil_scoped_acquire acquire;
+        ...
+        // Read input from the stream
+        PYOBJECT inputs = cc->Inputs().Index(0).Get<PYOBJECT>();
+        // Checks, translations etc.
+        ...
+        // Execute user code
+        outputs_raw = pythonNodeState.attr("execute")(inputs);
+        // Convert results to PYOBJECT
+        PYOBJECT outputs = convertToPYOBJECT(outputs_raw)
+        // Push outputs down the graph
+        cc->Outputs().Index(0).Add(outputs, cc->InputTimestamp());
+        ...
+        return absl::OkStatus();
+    }
+};
+*/

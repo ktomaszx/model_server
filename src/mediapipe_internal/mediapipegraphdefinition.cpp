@@ -133,6 +133,9 @@ Status MediapipeGraphDefinition::validate(ModelManager& manager) {
 
 void MediapipeGraphDefinition::initializeNodes() {
     SPDLOG_INFO("MediapipeGraphDefinition initializing graph nodes");
+    std::string tmp;
+    this->config.SerializeToString(&tmp);
+    SPDLOG_DEBUG(tmp);
     for (int i = 0; i < config.node().size(); i++){
         if (config.node(i).node_options().size()) {
             mediapipe::PythonBackendCalculatorOptions options;
@@ -152,6 +155,7 @@ void MediapipeGraphDefinition::initializeNodes() {
             py::object model_instance = OvmsPythonModel();
             model_instance.attr("initialize")();
             this->userPythonObject = model_instance;
+            SPDLOG_DEBUG(config.node(i).name());
         }
     }
 }
