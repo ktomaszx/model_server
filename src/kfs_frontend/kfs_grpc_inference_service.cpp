@@ -21,6 +21,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 #include "../dags/pipeline.hpp"
 #include "../dags/pipelinedefinition.hpp"
@@ -272,6 +274,17 @@ Status KFSInferenceServiceImpl::ModelMetadataImpl(::grpc::ServerContext* context
     }
     OBSERVE_IF_ENABLED(reporter->requestTimeGrpc, requestTotal);
     return grpc(status);
+}
+
+::grpc::Status KFSInferenceServiceImpl::ModelStreamInfer(::grpc::ServerContext* context, ::grpc::ServerReaderWriter< ::inference::ModelStreamInferResponse, ::inference::ModelInferRequest>* stream) {
+    ::inference::ModelStreamInferResponse resp;
+    SPDLOG_INFO("I'm streaming! --------------------------------");
+    for (int i = 0; i < 20; i++) {
+        resp.mutable_infer_response()->set_id(std::to_string(i));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        stream->Write(resp);
+    }
+    return ::grpc::Status::OK;
 }
 
 Status KFSInferenceServiceImpl::ModelInferImpl(::grpc::ServerContext* context, const KFSRequest* request, KFSResponse* response, ExecutionContext executionContext, ServableMetricReporter*& reporterOut) {
