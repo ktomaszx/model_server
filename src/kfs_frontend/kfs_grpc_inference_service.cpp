@@ -284,6 +284,10 @@ Status KFSInferenceServiceImpl::ModelMetadataImpl(::grpc::ServerContext* context
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         stream->Write(resp);
     }
+    /*
+/root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.pb.h
+/root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.grpc.pb.h
+    */
     return ::grpc::Status::OK;
 }
 
