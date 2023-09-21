@@ -276,14 +276,76 @@ Status KFSInferenceServiceImpl::ModelMetadataImpl(::grpc::ServerContext* context
     return grpc(status);
 }
 
+/*
+
+# streaming (triton's decoupled)
+def execute(inputs, **kwargs):
+    for i in range(20):
+        yield outputs
+    return None
+
+
+# non-streaming (triton's default)
+def execute(inputs, **kwargs):
+    for i in range(20):
+        pass
+    return outputs
+
+
+################## Darek ##################
+- Generative AI (unary->stream)
+- Camera stream (stream->stream)
+
+
+Graph Re-use
+
+Client:
+
+start stream
+while True
+    send frame 30FPS
+
+=====================================
+
+Server:
+Request Start
+
+Create Graph
+
+while True:
+    Read(timeout=1s) (missing param)
+    Frame
+    Graph->Push(Frame)
+
+while True:
+    Wait For End Packet
+    Serialization:
+        Wait for all packets
+        Serialize
+        Send.
+
+Delete graph
+
+
+*/
+
 ::grpc::Status KFSInferenceServiceImpl::ModelStreamInfer(::grpc::ServerContext* context, ::grpc::ServerReaderWriter< ::inference::ModelStreamInferResponse, ::inference::ModelInferRequest>* stream) {
     ::inference::ModelStreamInferResponse resp;
-    SPDLOG_INFO("I'm streaming! --------------------------------");
+    SPDLOG_INFO("11111 I'm streaming! --------------------------------");
+
+    for (int i = 0; i < 5; i++) {
+        ::inference::ModelInferRequest req;
+        stream->Read(&req);
+        SPDLOG_INFO("pppp [{}]", req.id());
+    }
+
+    SPDLOG_INFO("22222 I'm streaming! --------------------------------");
     for (int i = 0; i < 20; i++) {
         resp.mutable_infer_response()->set_id(std::to_string(i));
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        stream->Write(resp);
+        stream->Write(resp); // blocking
     }
+    SPDLOG_INFO("3333 I'm streaming! --------------------------------");
     /*
 /root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.pb.h
 /root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.grpc.pb.h
