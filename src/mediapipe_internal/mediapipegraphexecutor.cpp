@@ -484,6 +484,7 @@ static std::map<std::string, mediapipe::Packet> createInputSidePackets(const KFS
             SPDLOG_DEBUG("Handling parameters of different types than: bool, string, int64 is not supported");
         }
     }
+    inputSidePackets["sidepack"] = mediapipe::MakePacket<int>(34).At(mediapipe::Timestamp(STARTING_TIMESTAMP));
     return inputSidePackets;
 }
 

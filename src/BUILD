@@ -415,6 +415,7 @@ cc_library(
                 "mediapipe_internal/mediapipegraphexecutor.cpp",
                 "mediapipe_internal/mediapipegraphexecutor.hpp",
                 "mediapipe_internal/packettypes.hpp",
+                "mediapipe_calculators/my_calculator.cc",
             ],
             "//src:disable_mediapipe" : [],
         }),
