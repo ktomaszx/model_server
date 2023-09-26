@@ -1,5 +1,7 @@
 #include <iostream>
 #include <openvino/openvino.hpp>
+#include <chrono>
+#include <thread>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -21,6 +23,7 @@ public:
     absl::Status Close(CalculatorContext* cc) final {
         return absl::OkStatus();
     }
+
     absl::Status Open(CalculatorContext* cc) final {
         return absl::OkStatus();
     }
@@ -28,11 +31,15 @@ public:
     absl::Status Process(CalculatorContext* cc) final {
         int a = cc->InputSidePackets().Index(0).Get<int>();  // TODO: GrpcWriterSender
         std::cout << "-------======------ Processing MyCalculator, value=" << a << std::endl;
-        cc->Outputs().Index(0).Add(
-            new ov::Tensor(
-                ov::element::Type_t::f32,
-                ov::Shape{1,1}),
-            cc->InputTimestamp());
+
+        for (int i = 0; i < 10; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            cc->Outputs().Index(0).Add(
+                new ov::Tensor(
+                    ov::element::Type_t::f32,
+                    ov::Shape{1,1}),
+                Timestamp(32 + i));
+        }
         return absl::OkStatus();
     }
 };

@@ -335,7 +335,10 @@ Delete graph
 
     for (int i = 0; i < 5; i++) {
         ::inference::ModelInferRequest req;
-        stream->Read(&req);
+        if (!stream->Read(&req)) {
+            SPDLOG_INFO("Client disconnected 1");
+            return ::grpc::Status::OK;
+        }
         SPDLOG_INFO("pppp [{}]", req.id());
     }
 
@@ -343,7 +346,10 @@ Delete graph
     for (int i = 0; i < 20; i++) {
         resp.mutable_infer_response()->set_id(std::to_string(i));
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        stream->Write(resp); // blocking
+        if (!stream->Write(resp)) { // blocking
+            SPDLOG_INFO("Client disconnected 2");
+            return ::grpc::Status::OK;
+        }
     }
     SPDLOG_INFO("3333 I'm streaming! --------------------------------");
     /*
