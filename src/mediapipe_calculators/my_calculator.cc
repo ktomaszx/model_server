@@ -18,7 +18,6 @@ public:
         cc->Inputs().Index(0).Set<ov::Tensor>();
         cc->Inputs().Index(1).Set<ov::Tensor>();
         cc->Outputs().Index(0).Set<ov::Tensor>();
-        cc->InputSidePackets().Index(0).Set<int>();
         return absl::OkStatus();
     }
 
@@ -31,7 +30,7 @@ public:
     }
 
     absl::Status Process(CalculatorContext* cc) final {
-        if (iteration >= 20) {
+        if (iteration >= 5) {
             return absl::OkStatus();
         }
 
@@ -43,6 +42,9 @@ public:
         for (size_t i = 0; i < output.get_byte_size() / sizeof(int64_t); i++) {
             reinterpret_cast<int64_t*>(output.data())[i] += 1;
         }
+        // imitate workload
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(1000ms);
 
         cc->Outputs().Index(0).Add(new ov::Tensor(output), Timestamp(++iteration));
         return absl::OkStatus();

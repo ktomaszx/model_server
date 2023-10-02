@@ -345,7 +345,7 @@ Delete graph
     if (!status.ok()) {
         return grpc(status);
     }
-    return grpc(executor->inferStream());
+    return grpc(executor->inferStream(&request, stream));
 
 #else
     SPDLOG_DEBUG("Mediapipe disabled, cannot run streaming request");
