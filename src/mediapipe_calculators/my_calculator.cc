@@ -12,11 +12,13 @@
 namespace mediapipe {
 
 class MyCalculator : public CalculatorBase {
+    int iteration = 0;
 public:
     static absl::Status GetContract(CalculatorContract* cc) {
         cc->Inputs().Index(0).Set<ov::Tensor>();
+        cc->Inputs().Index(1).Set<ov::Tensor>();
         cc->Outputs().Index(0).Set<ov::Tensor>();
-        cc->InputSidePackets().Index(0).Set<int>();  // TODO: GrpcWriterSender
+        cc->InputSidePackets().Index(0).Set<int>();
         return absl::OkStatus();
     }
 
@@ -29,17 +31,20 @@ public:
     }
 
     absl::Status Process(CalculatorContext* cc) final {
-        int a = cc->InputSidePackets().Index(0).Get<int>();  // TODO: GrpcWriterSender
-        std::cout << "-------======------ Processing MyCalculator, value=" << a << std::endl;
-
-        for (int i = 0; i < 10; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            cc->Outputs().Index(0).Add(
-                new ov::Tensor(
-                    ov::element::Type_t::f32,
-                    ov::Shape{1,1}),
-                Timestamp(32 + i));
+        if (iteration >= 20) {
+            return absl::OkStatus();
         }
+
+        int data_index = cc->Inputs().Index(0).IsEmpty() ? 1 : 0;
+        ov::Tensor data = cc->Inputs().Index(data_index).Get<ov::Tensor>(); 
+
+        ov::Tensor output = ov::Tensor(data.get_element_type(), data.get_shape());
+        std::memcpy(output.data(), data.data(), output.get_byte_size());
+        for (size_t i = 0; i < output.get_byte_size() / sizeof(int64_t); i++) {
+            reinterpret_cast<int64_t*>(output.data())[i] += 1;
+        }
+
+        cc->Outputs().Index(0).Add(new ov::Tensor(output), Timestamp(++iteration));
         return absl::OkStatus();
     }
 };

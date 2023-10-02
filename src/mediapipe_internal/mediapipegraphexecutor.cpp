@@ -880,4 +880,9 @@ Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* res
     return StatusCode::OK;
 }
 
+Status MediapipeGraphExecutor::inferStream() const {
+    SPDLOG_INFO("Infering Stream!");
+    return StatusCode::OK;
+}
+
 }  // namespace ovms

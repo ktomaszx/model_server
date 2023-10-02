@@ -330,32 +330,54 @@ Delete graph
 */
 
 ::grpc::Status KFSInferenceServiceImpl::ModelStreamInfer(::grpc::ServerContext* context, ::grpc::ServerReaderWriter< ::inference::ModelStreamInferResponse, ::inference::ModelInferRequest>* stream) {
-    ::inference::ModelStreamInferResponse resp;
-    SPDLOG_INFO("11111 I'm streaming! --------------------------------");
+#if (MEDIAPIPE_DISABLE == 0)
 
-    for (int i = 0; i < 5; i++) {
-        ::inference::ModelInferRequest req;
-        if (!stream->Read(&req)) {
-            SPDLOG_INFO("Client disconnected 1");
-            return ::grpc::Status::OK;
-        }
-        SPDLOG_INFO("pppp [{}]", req.id());
+    // Wait for first request
+    ::inference::ModelInferRequest request;
+    if (!stream->Read(&request)) {
+        SPDLOG_INFO("Client disconnected during reading first message");
+        return ::grpc::Status::OK;
     }
 
-    SPDLOG_INFO("22222 I'm streaming! --------------------------------");
-    for (int i = 0; i < 20; i++) {
-        resp.mutable_infer_response()->set_id(std::to_string(i));
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if (!stream->Write(resp)) { // blocking
-            SPDLOG_INFO("Client disconnected 2");
-            return ::grpc::Status::OK;
-        }
+    Status status;
+    std::shared_ptr<MediapipeGraphExecutor> executor;
+    status = this->modelManager.createPipeline(executor, request.model_name(), nullptr, nullptr);
+    if (!status.ok()) {
+        return grpc(status);
     }
-    SPDLOG_INFO("3333 I'm streaming! --------------------------------");
-    /*
-/root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.pb.h
-/root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.grpc.pb.h
-    */
+    return grpc(executor->inferStream());
+
+#else
+    SPDLOG_DEBUG("Mediapipe disabled, cannot run streaming request");
+    return ::grpc::Status::OK;
+#endif
+
+//     ::inference::ModelStreamInferResponse resp;
+//     SPDLOG_INFO("11111 I'm streaming! --------------------------------");
+
+//     for (int i = 0; i < 5; i++) {
+//         ::inference::ModelInferRequest req;
+//         if (!stream->Read(&req)) {
+//             SPDLOG_INFO("Client disconnected 1");
+//             return ::grpc::Status::OK;
+//         }
+//         SPDLOG_INFO("pppp [{}]", req.id());
+//     }
+
+//     SPDLOG_INFO("22222 I'm streaming! --------------------------------");
+//     for (int i = 0; i < 20; i++) {
+//         resp.mutable_infer_response()->set_id(std::to_string(i));
+//         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+//         if (!stream->Write(resp)) { // blocking
+//             SPDLOG_INFO("Client disconnected 2");
+//             return ::grpc::Status::OK;
+//         }
+//     }
+//     SPDLOG_INFO("3333 I'm streaming! --------------------------------");
+//     /*
+// /root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.pb.h
+// /root/.cache/bazel/_bazel_root/bc57d4817a53cab8c785464da57d1983/execroot/ovms/bazel-out/k8-opt/bin/src/kfserving_api/grpc_predict_v2.grpc.pb.h
+//     */
     return ::grpc::Status::OK;
 }
 

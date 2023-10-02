@@ -429,6 +429,7 @@ cc_library(
                 "@mediapipe//mediapipe/graphs/holistic_tracking:holistic_tracking_to_render_data",
                 "@mediapipe//mediapipe/graphs/iris_tracking:iris_tracking_cpu_deps",
                 "@mediapipe//mediapipe/calculators/tensor:image_to_tensor_calculator",
+                "@mediapipe//mediapipe/framework/stream_handler:immediate_input_stream_handler",
                 "@mediapipe//mediapipe/modules/holistic_landmark:holistic_landmark_cpu",
             ],
             "//src:disable_mediapipe" : [],
