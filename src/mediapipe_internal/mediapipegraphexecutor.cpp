@@ -914,18 +914,46 @@ Status MediapipeGraphExecutor::inferStream(const KFSRequest* request, ::grpc::Se
         return Status(StatusCode::MEDIAPIPE_GRAPH_INITIALIZATION_ERROR, std::move(absMessage));
     }
 
+    std::unordered_map<std::string, std::map<::mediapipe::Timestamp, const ::mediapipe::Packet>> collector;
     for (auto& name : this->outputNames) {
         if (name.empty()) {
             SPDLOG_DEBUG("Creating Mediapipe graph outputs name failed for: {}", name);
             return StatusCode::MEDIAPIPE_GRAPH_ADD_OUTPUT_STREAM_ERROR;
         }
+        collector[name] = {};
         //auto absStatusOrPoller = graph.AddOutputStreamPoller(name);
-        absStatus = graph.ObserveOutputStream(name, [name, stream](const ::mediapipe::Packet& packet) -> absl::Status {
-            ::inference::ModelStreamInferResponse resp;
-            auto status = receiveAndSerializePacket<ov::Tensor>(packet, *resp.mutable_infer_response(), name);
-            if (!status.ok()) {
-                SPDLOG_INFO("Error during serialization!");
+        absStatus = graph.ObserveOutputStream(name, [name, stream, &collector](const ::mediapipe::Packet& packet) -> absl::Status {
+            SPDLOG_INFO("Callback start");
+            // TODO: needs lock? 
+
+            SPDLOG_INFO("Inserting {} timestamp to sink {}", packet.Timestamp().DebugString(), name);
+            collector[name].insert(std::make_pair(packet.Timestamp(), packet));
+            //return absl::OkStatus();
+
+            bool hasTimestampForAllOutputs = true;
+            for (const auto& [n, sink] : collector) {
+                if (sink.count(packet.Timestamp()) == 0) {
+                    SPDLOG_INFO("Have no timestamp {} yet for {}", packet.Timestamp().DebugString(), n);
+                    hasTimestampForAllOutputs = false;
+                    break;
+                }
+            }
+
+            if (!hasTimestampForAllOutputs) {
+                SPDLOG_INFO("Received packet for serialization, but it is not time to write...");
+                // do not serialize yet
                 return absl::OkStatus();
+            }
+
+            ::inference::ModelStreamInferResponse resp;
+            for (auto& [outName, sink] : collector) {
+                const auto& packetToSerialize = sink.at(packet.Timestamp());
+                auto status = receiveAndSerializePacket<ov::Tensor>(packetToSerialize, *resp.mutable_infer_response(), outName);
+                if (!status.ok()) {
+                    SPDLOG_INFO("Error during serialization!");
+                    return absl::OkStatus();
+                }
+                sink.erase(packet.Timestamp());
             }
             SPDLOG_INFO("Received packet for serialization! Will write now");
             stream->Write(resp);
