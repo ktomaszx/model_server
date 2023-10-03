@@ -1,0 +1,5 @@
+image_*
+*.jpeg
+mediapipe/
+ovms/
+images/

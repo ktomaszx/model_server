@@ -880,23 +880,46 @@ Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* res
     return StatusCode::OK;
 }
 
-Status pushRequestToGraph(const KFSRequest& request, ::mediapipe::CalculatorGraph& graph, int64_t no_of_request) {
+Status pushRequestToGraph(const KFSRequest& request, ::mediapipe::CalculatorGraph& graph, int64_t no_of_request, const stream_types_mapping_t& inputTypes) {
     // TODO: Validation
     for (const auto& input : request.inputs()) {
         const auto name = input.name();
-        std::unique_ptr<ov::Tensor> input_tensor;
-        auto status = deserializeTensor(name, request, input_tensor);
-        if (!status.ok()) {
-            return status;
-        }
-        auto absStatus = graph.AddPacketToInputStream(
-            name,
-            ::mediapipe::Adopt<ov::Tensor>(input_tensor.release()).At(::mediapipe::Timestamp(no_of_request)));
-        if (!absStatus.ok()) {
-            const std::string absMessage = absStatus.ToString();
-            SPDLOG_DEBUG("Failed to add stream: {} packet to mediapipe graph: {} with error: {}",
-                name, request.model_name(), absStatus.message(), absStatus.raw_code());
-            return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_PACKET_INPUT_STREAM, std::move(absMessage));
+        if (inputTypes.at(name) == mediapipe_packet_type_enum::MEDIAPIPE_IMAGE) {
+
+                // MP IMAGE FOR HOLISTIC
+
+            std::unique_ptr<mediapipe::ImageFrame> input_tensor;
+            auto status = deserializeTensor(name, request, input_tensor);
+            if (!status.ok()) {
+                return status;
+            }
+            auto absStatus = graph.AddPacketToInputStream(
+                name,
+                ::mediapipe::Adopt<mediapipe::ImageFrame>(input_tensor.release()).At(::mediapipe::Timestamp(no_of_request)));
+            if (!absStatus.ok()) {
+                const std::string absMessage = absStatus.ToString();
+                SPDLOG_DEBUG("Failed to add stream: {} packet to mediapipe graph: {} with error: {}",
+                    name, request.model_name(), absStatus.message(), absStatus.raw_code());
+                return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_PACKET_INPUT_STREAM, std::move(absMessage));
+            }
+
+
+        } else {
+        
+            std::unique_ptr<ov::Tensor> input_tensor;
+            auto status = deserializeTensor(name, request, input_tensor);
+            if (!status.ok()) {
+                return status;
+            }
+            auto absStatus = graph.AddPacketToInputStream(
+                name,
+                ::mediapipe::Adopt<ov::Tensor>(input_tensor.release()).At(::mediapipe::Timestamp(no_of_request)));
+            if (!absStatus.ok()) {
+                const std::string absMessage = absStatus.ToString();
+                SPDLOG_DEBUG("Failed to add stream: {} packet to mediapipe graph: {} with error: {}",
+                    name, request.model_name(), absStatus.message(), absStatus.raw_code());
+                return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_PACKET_INPUT_STREAM, std::move(absMessage));
+            }
         }
     }
     return StatusCode::OK;
@@ -922,7 +945,7 @@ Status MediapipeGraphExecutor::inferStream(const KFSRequest* request, ::grpc::Se
         }
         collector[name] = {};
         //auto absStatusOrPoller = graph.AddOutputStreamPoller(name);
-        absStatus = graph.ObserveOutputStream(name, [name, stream, &collector](const ::mediapipe::Packet& packet) -> absl::Status {
+        absStatus = graph.ObserveOutputStream(name, [this, name, stream, &collector](const ::mediapipe::Packet& packet) -> absl::Status {
             SPDLOG_INFO("Callback start");
             // TODO: needs lock? 
 
@@ -948,10 +971,18 @@ Status MediapipeGraphExecutor::inferStream(const KFSRequest* request, ::grpc::Se
             ::inference::ModelStreamInferResponse resp;
             for (auto& [outName, sink] : collector) {
                 const auto& packetToSerialize = sink.at(packet.Timestamp());
-                auto status = receiveAndSerializePacket<ov::Tensor>(packetToSerialize, *resp.mutable_infer_response(), outName);
-                if (!status.ok()) {
-                    SPDLOG_INFO("Error during serialization!");
-                    return absl::OkStatus();
+                if (this->outputTypes.at(outName) == mediapipe_packet_type_enum::MEDIAPIPE_IMAGE) {
+                    auto status = receiveAndSerializePacket<mediapipe::ImageFrame>(packetToSerialize, *resp.mutable_infer_response(), outName);
+                    if (!status.ok()) {
+                        SPDLOG_INFO("Error during serialization!");
+                        return absl::OkStatus();
+                    }
+                } else {
+                    auto status = receiveAndSerializePacket<ov::Tensor>(packetToSerialize, *resp.mutable_infer_response(), outName);
+                    if (!status.ok()) {
+                        SPDLOG_INFO("Error during serialization!");
+                        return absl::OkStatus();
+                    }
                 }
                 sink.erase(packet.Timestamp());
             }
@@ -975,14 +1006,14 @@ Status MediapipeGraphExecutor::inferStream(const KFSRequest* request, ::grpc::Se
         return Status(StatusCode::MEDIAPIPE_GRAPH_START_ERROR, std::move(absMessage));
     }
 
-    auto status = pushRequestToGraph(*request, graph, no_of_request);
+    auto status = pushRequestToGraph(*request, graph, no_of_request, this->inputTypes);
     if (!status.ok()) {
         return status;
     }
 
     KFSRequest followingRequests;
     while (stream->Read(&followingRequests)) {
-        status = pushRequestToGraph(followingRequests, graph, ++no_of_request);
+        status = pushRequestToGraph(followingRequests, graph, ++no_of_request, this->inputTypes);
         if (!status.ok()) {
             return status;
         }
