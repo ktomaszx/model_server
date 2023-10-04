@@ -110,4 +110,7 @@ struct OvmsPyTensor {
     // Construct object from buffer info
     OvmsPyTensor(const std::string& name, py::buffer_info bufferInfo);
 };
+
+typedef std::vector<OvmsPyTensor> PyTensors;
+
 }  // namespace ovms

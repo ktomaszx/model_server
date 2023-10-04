@@ -58,6 +58,12 @@
 #include "tensorflow/lite/interpreter.h"
 #pragma GCC diagnostic pop
 
+#if (PYTHON_DISABLE == 0)
+#include "../ovms_py_tensor.hpp"
+#include <pybind11/pybind11.h>
+namespace py = pybind11;
+#endif
+
 namespace ovms {
 static Status getRequestInput(google::protobuf::internal::RepeatedPtrIterator<const inference::ModelInferRequest_InferInputTensor>& itr, const std::string& requestedName, const KFSRequest& request) {
     auto requestInputItr = std::find_if(request.inputs().begin(), request.inputs().end(), [&requestedName](const ::KFSRequest::InferInputTensor& tensor) { return tensor.name() == requestedName; });
@@ -453,6 +459,38 @@ static Status deserializeTensor(const std::string& requestedName, const KFSReque
     HANDLE_DESERIALIZATION_EXCEPTION("Mediapipe ImageFrame")
     return StatusCode::OK;
 }
+
+#if (PYTHON_DISABLE == 0)
+static Status deserializeTensor(const std::string& requestedName, const KFSRequest& request, std::unique_ptr<OvmsPyTensor>& outTensor) {
+    auto requestInputItr = request.inputs().begin();
+    auto status = getRequestInput(requestInputItr, requestedName, request);
+    if (!status.ok()) {
+        return status;
+    }
+    auto inputIndex = requestInputItr - request.inputs().begin();
+    auto& bufferLocation = request.raw_input_contents().at(inputIndex);
+    try {
+        std::vector<py::ssize_t> shape;
+        for (int i = 0; i < requestInputItr->shape().size(); i++) {
+            if (requestInputItr->shape()[i] < 0) {
+                std::stringstream ss;
+                ss << "Negative dimension size is not acceptable: " << tensorShapeToString(requestInputItr->shape()) << "; input name: " << requestedName;
+                const std::string details = ss.str();
+                SPDLOG_DEBUG("[servable name: {} version: {}] Invalid shape - {}", request.model_name(), request.model_version(), details);
+                return Status(StatusCode::INVALID_SHAPE, details);
+            }
+            shape.push_back(requestInputItr->shape()[i]);
+        }
+
+        requestInputItr->datatype()
+        bufferLocation.size()
+        outTensor = std::make_unique<OvmsPyTensor>(requestedName, const_cast<void*>((const void*)bufferLocation.data()), requestInputItr->datatype(), bufferLocation.size());
+        }
+    }
+    HANDLE_DESERIALIZATION_EXCEPTION("Ovms Python tensor")
+    return StatusCode::OK;
+}
+#endif
 
 MediapipeGraphExecutor::MediapipeGraphExecutor(const std::string& name, const std::string& version, const ::mediapipe::CalculatorGraphConfig& config,
     stream_types_mapping_t inputTypes,
