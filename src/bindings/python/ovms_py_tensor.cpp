@@ -14,7 +14,7 @@
 // limitations under the License.
 //*****************************************************************************
 
-#include "../../ovms_py_tensor.hpp"
+#include "../../python/ovms_py_tensor.hpp"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -33,12 +33,17 @@ PYBIND11_MODULE(pyovms, m) {
                 m.bufferShape,
                 m.strides);
         })
-        .def(py::init([](std::string name, py::buffer b) {
-            /* Request a buffer descriptor from Python */
-            return OvmsPyTensor(name, b.request());
-        }))
+        //.def(py::init([](std::string name, py::buffer buffer) {
+        //    /* Request a buffer descriptor from Python */
+        //    return OvmsPyTensor(name, buffer);
+        //}, py::return_value_policy::reference))
+        .def(py::init<std::string, const py::buffer&>())
+        .def_static("create_from_data", [](const std::string& name, void* ptr, const std::vector<py::ssize_t>& shape, const std::string& datatype, py::ssize_t size) {
+            return OvmsPyTensor(name, ptr, shape, datatype, size);
+        })
         .def_readonly("name", &OvmsPyTensor::name)
         .def_property_readonly("data", [](const py::object& m) -> py::memoryview { return py::memoryview(m); })
         .def_property_readonly("shape", [](const OvmsPyTensor& m) -> py::tuple { return py::tuple(py::cast(m.userShape)); })
-        .def_readonly("datatype", &OvmsPyTensor::datatype);
+        .def_readonly("datatype", &OvmsPyTensor::datatype)
+        .def_readonly("ref_obj", &OvmsPyTensor::refObj);
 }

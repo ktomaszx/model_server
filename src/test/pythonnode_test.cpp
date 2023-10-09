@@ -148,7 +148,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeFileDoesNotExist) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/22script2.py"
                 }
             }
@@ -177,7 +177,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeNameAlreadyExist) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/script.py"
                 }
             }
@@ -189,7 +189,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeNameAlreadyExist) {
             input_stream: "in"
             output_stream: "out3"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/script2.py"
                 }
             }
@@ -218,7 +218,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeInitFailed) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/fail_script.py"
                 }
             }
@@ -247,7 +247,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeReturnFalse) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/return_false_script.py"
                 }
             }
@@ -276,7 +276,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeInitException) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/exception_script.py"
                 }
             }
@@ -328,7 +328,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeNameMissing) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/fail_script.py"
                 }
             }
@@ -357,7 +357,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeNameDoesNotExist) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/script.py"
                 }
             }
@@ -387,7 +387,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodeInitMembers) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/script.py"
                 }
             }
@@ -448,7 +448,7 @@ TEST_F(MediapipePythonNodeTest, PythonNodePassArgumentsToConstructor) {
             input_stream: "in"
             output_stream: "out2"
             node_options: {
-                [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
                     handler_path: "/ovms/src/test/mediapipe/python/script2.py"
                 }
             }

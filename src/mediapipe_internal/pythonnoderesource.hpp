@@ -20,7 +20,7 @@
 #if (PYTHON_DISABLE == 0)
 #include <pybind11/embed.h>  // everything needed for embedding
 
-#include "src/mediapipe_calculators/python_backend_calculator.pb.h"
+#include "src/mediapipe_calculators/python_executor_calculator_options.pb.h"
 
 namespace py = pybind11;
 #endif
@@ -33,9 +33,12 @@ public:
     PythonNodeResource(const PythonNodeResource&) = delete;
     PythonNodeResource& operator=(PythonNodeResource&) = delete;
 #if (PYTHON_DISABLE == 0)
+    std::unique_ptr<py::object> nodeResourceObject;
+    std::unique_ptr<py::object> pyovmsModule;
+    std::unique_ptr<py::object> tensorClass;
+
     PythonNodeResource();
     PythonNodeResource(const google::protobuf::Any& nodeOptions, Status& status);
-    std::unique_ptr<py::object> nodeResourceObject;
     ~PythonNodeResource();
     static Status createPythonNodeResource(std::shared_ptr<PythonNodeResource>& nodeResource, const google::protobuf::Any& nodeOptions);
 #endif

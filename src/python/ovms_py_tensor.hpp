@@ -18,6 +18,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 #include <pybind11/pybind11.h>
 
@@ -102,15 +103,21 @@ struct OvmsPyTensor {
     py::ssize_t itemsize;
     std::vector<py::ssize_t> strides;
 
+    // Reference to the Python object that owns underlaying data buffer
+    py::object refObj;
+    bool ownsdata;
+
     // ---
 
     // Construct object from request contents
     OvmsPyTensor(const std::string& name, void* ptr, const std::vector<py::ssize_t>& shape, const std::string& datatype, py::ssize_t size);
 
     // Construct object from buffer info
-    OvmsPyTensor(const std::string& name, py::buffer_info bufferInfo);
+    OvmsPyTensor(const std::string& name, const py::buffer& buffer);
+
+    //OvmsPyTensor(OvmsPyTensor& other) = delete;
+
+    ~OvmsPyTensor();
+
 };
-
-typedef std::vector<OvmsPyTensor> PyTensors;
-
 }  // namespace ovms

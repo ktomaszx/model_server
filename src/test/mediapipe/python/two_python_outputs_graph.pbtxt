@@ -24,7 +24,7 @@ node {
   input_stream: "in"
   output_stream: "out"
   node_options: {
-    [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+    [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
       handler_path: "/ovms/src/test/mediapipe/python/script.py"
     }
   }
@@ -36,7 +36,7 @@ node {
   input_stream: "in"
   output_stream: "out2"
   node_options: {
-    [type.googleapis.com / mediapipe.PythonBackendCalculatorOptions]: {
+    [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
       handler_path: "/ovms/src/test/mediapipe/python/script2.py"
     }
   }

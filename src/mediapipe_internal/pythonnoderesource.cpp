@@ -27,7 +27,7 @@
 #if (PYTHON_DISABLE == 0)
 #include <pybind11/embed.h>  // everything needed for embedding
 
-#include "src/mediapipe_calculators/python_backend_calculator.pb.h"
+#include "src/mediapipe_calculators/python_executor_calculator_options.pb.h"
 #endif
 
 namespace ovms {
@@ -35,10 +35,12 @@ namespace ovms {
 #if (PYTHON_DISABLE == 0)
 PythonNodeResource::PythonNodeResource() {
     this->nodeResourceObject = nullptr;
+    this->tensorClass = nullptr;
+    this->pyovmsModule = nullptr;
 }
 
 Status PythonNodeResource::createPythonNodeResource(std::shared_ptr<PythonNodeResource>& nodeResource, const google::protobuf::Any& nodeOptions) {
-    mediapipe::PythonBackendCalculatorOptions options;
+    mediapipe::PythonExecutorCalculatorOptions options;
     nodeOptions.UnpackTo(&options);
     if (!std::filesystem::exists(options.handler_path())) {
         SPDLOG_LOGGER_DEBUG(modelmanager_logger, "Python node file: {} does not exist. ", options.handler_path());
@@ -52,13 +54,13 @@ Status PythonNodeResource::createPythonNodeResource(std::shared_ptr<PythonNodeRe
 
     try {
         py::gil_scoped_acquire acquire;
+
         py::module_ sys = py::module_::import("sys");
         sys.attr("path").attr("append")(parentPath.c_str());
         py::module_ script = py::module_::import(filename.c_str());
         py::object OvmsPythonModel = script.attr("OvmsPythonModel");
         py::object pythonModel = OvmsPythonModel();
         py::object kwargsParam = pybind11::dict();
-        // TODO: check bool if true
         py::bool_ success = pythonModel.attr("initialize")(kwargsParam);
 
         if (!success) {
@@ -67,6 +69,8 @@ Status PythonNodeResource::createPythonNodeResource(std::shared_ptr<PythonNodeRe
         }
 
         nodeResource = std::make_shared<PythonNodeResource>();
+        nodeResource->pyovmsModule = std::make_unique<py::object>(py::module_::import("pyovms"));
+        nodeResource->tensorClass = std::make_unique<py::object>(nodeResource->pyovmsModule->attr("Tensor"));
         nodeResource->nodeResourceObject = std::make_unique<py::object>(pythonModel);
     } catch (const pybind11::error_already_set& e) {
         SPDLOG_ERROR("Failed to process python node file {} : {}", options.handler_path(), e.what());
@@ -80,8 +84,11 @@ Status PythonNodeResource::createPythonNodeResource(std::shared_ptr<PythonNodeRe
 }
 
 PythonNodeResource::~PythonNodeResource() {
+    SPDLOG_ERROR("Calling Python node resource destructor");
     py::gil_scoped_acquire acquire;
     this->nodeResourceObject.get()->dec_ref();
+    this->pyovmsModule.get()->dec_ref();
+    this->tensorClass.get()->dec_ref();
 }
 #endif
 

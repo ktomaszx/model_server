@@ -46,7 +46,7 @@ namespace ovms {
 MediapipeGraphConfig MediapipeGraphDefinition::MGC;
 
 const std::string MediapipeGraphDefinition::SCHEDULER_CLASS_NAME{"Mediapipe"};
-const std::string MediapipeGraphDefinition::PYTHON_NODE_CALCULATOR_NAME{"PythonBackendCalculator"};
+const std::string MediapipeGraphDefinition::PYTHON_NODE_CALCULATOR_NAME{"PythonExecutorCalculator"};
 
 MediapipeGraphDefinition::~MediapipeGraphDefinition() = default;
 
@@ -245,6 +245,7 @@ const std::string MP_TENSOR_PREFIX{"TENSOR"};
 const std::string TF_TENSOR_PREFIX{"TFTENSOR"};
 const std::string TFLITE_TENSOR_PREFIX{"TFLITE_TENSOR"};
 const std::string OV_TENSOR_PREFIX{"OVTENSOR"};
+const std::string OVMS_PY_TENSOR_PREFIX{"OVMS_PY_TENSOR"};
 const std::string MP_IMAGE_PREFIX{"IMAGE"};
 
 Status MediapipeGraphDefinition::setStreamTypes() {
@@ -397,6 +398,7 @@ std::pair<std::string, mediapipe_packet_type_enum> MediapipeGraphDefinition::get
         {TF_TENSOR_PREFIX, mediapipe_packet_type_enum::TFTENSOR},
         {TFLITE_TENSOR_PREFIX, mediapipe_packet_type_enum::TFLITETENSOR},
         {OV_TENSOR_PREFIX, mediapipe_packet_type_enum::OVTENSOR},
+        {OVMS_PY_TENSOR_PREFIX, mediapipe_packet_type_enum::OVMS_PY_TENSOR},
         {MP_TENSOR_PREFIX, mediapipe_packet_type_enum::MPTENSOR},
         {MP_IMAGE_PREFIX, mediapipe_packet_type_enum::MEDIAPIPE_IMAGE}};
     std::vector<std::string> tokens = tokenize(streamFullName, ':');
@@ -445,14 +447,14 @@ Status MediapipeGraphDefinition::initializeNodes() {
                 return StatusCode::PYTHON_NODE_NAME_ALREADY_EXISTS;
             }
 
-            std::shared_ptr<PythonNodeResource> nodeResouce = nullptr;
-            Status status = PythonNodeResource::createPythonNodeResource(nodeResouce, config.node(i).node_options(0));
-            if (nodeResouce == nullptr || !status.ok()) {
+            std::shared_ptr<PythonNodeResource> nodeResource = nullptr;
+            Status status = PythonNodeResource::createPythonNodeResource(nodeResource, config.node(i).node_options(0));
+            if (nodeResource == nullptr || !status.ok()) {
                 SPDLOG_ERROR("Failed to process python node graph {}", this->name);
                 return status;
             }
 
-            this->pythonNodeResources.insert(std::pair<std::string, std::shared_ptr<PythonNodeResource>>(nodeName, std::move(nodeResouce)));
+            this->pythonNodeResources.insert(std::pair<std::string, std::shared_ptr<PythonNodeResource>>(nodeName, std::move(nodeResource)));
         }
     }
 #endif

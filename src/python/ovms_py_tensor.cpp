@@ -35,7 +35,9 @@ OvmsPyTensor::OvmsPyTensor(const std::string& name, void* ptr, const std::vector
     bufferShape(),
     ndim(),
     format(),
-    itemsize() {
+    itemsize(),
+    refObj(),
+    ownsdata(false) {
     // Map datatype to struct syntax format if it's known. Otherwise assume raw binary (UINT8 type)
     auto it = datatypeToBufferFormat.find(datatype);
     if (it != datatypeToBufferFormat.end()) {
@@ -55,17 +57,44 @@ OvmsPyTensor::OvmsPyTensor(const std::string& name, void* ptr, const std::vector
     }
 }
 
-OvmsPyTensor::OvmsPyTensor(const std::string& name, py::buffer_info bufferInfo) :
+OvmsPyTensor::OvmsPyTensor(const std::string& name, const py::buffer& buffer) :
     name(name),
-    ptr(bufferInfo.ptr),
-    bufferShape(bufferInfo.shape),
-    ndim(bufferInfo.ndim),
-    format(bufferInfo.format),
-    itemsize(bufferInfo.itemsize),
-    strides(bufferInfo.strides) {
+    ptr(),
+    bufferShape(),
+    ndim(),
+    format(),
+    itemsize(),
+    strides(),
+    refObj(buffer),
+    ownsdata(true) {
+
+    py::buffer_info bufferInfo = py::cast<py::buffer>(refObj).request();
+    ptr = bufferInfo.ptr;
+    bufferShape = bufferInfo.shape;
+    ndim = bufferInfo.ndim;
+    format = bufferInfo.format;
+    itemsize = bufferInfo.itemsize;
+    strides = bufferInfo.strides;
+
     size = std::accumulate(std::begin(bufferShape), std::end(bufferShape), 1, std::multiplies<py::ssize_t>()) * itemsize;
     userShape = bufferShape;
     datatype = format;
     auto it = bufferFormatToDatatype.find(format);
     datatype = it != datatypeToBufferFormat.end() ? it->second : format;
+}
+
+
+OvmsPyTensor::~OvmsPyTensor() {
+    py::gil_scoped_acquire acquire;
+    std::cout << std::endl << std::endl << "Calling OvmsPyTensor destructor" <<
+    std::endl << "OvmsPyTensor name - " << this->name <<
+    std::endl << "OvmsPyTensor ptr - " << this->ptr <<
+    std::endl << "OvmsPyTensor refObj - " << this->refObj.ptr() <<std::endl;
+    if (ownsdata) {
+        std::cout << "Underlying object refCount: " << refObj.ref_count() <<std::endl;
+        std::cout << "OvmsPyTensor data owned. Removing underlying object." << std::endl;
+        this->refObj.dec_ref();
+    } else {
+        std::cout << "OvmsPyTensor data not owned" << std::endl;
+    }
 }
