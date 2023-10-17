@@ -22,8 +22,11 @@
 #include "mediapipe/framework/calculator_framework.h"
 #pragma GCC diagnostic pop
 
+#include <Python.h>
 #include <pybind11/embed.h> // everything needed for embedding
 #include <pybind11/stl.h>
+
+#include "../python/python_backend.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -45,10 +48,10 @@ public:
         //RET_CHECK(!cc->Inputs().GetTags().empty());
         //RET_CHECK(!cc->Outputs().GetTags().empty());
         for (auto& input : cc->Inputs()) {
-            input.Set<OvmsPyTensorPtr>();
+            input.Set<PyObjectWrapper>();
         }
         for (auto& output : cc->Outputs()) {
-            output.Set<OvmsPyTensorPtr>();
+            output.Set<PyObjectWrapper>();
         }
         cc->InputSidePackets().Tag(INPUT_SIDE_PACKET_TAG).Set<PythonNodesResources>();
         return absl::OkStatus();
@@ -71,24 +74,22 @@ public:
     }
 
     absl::Status Process(CalculatorContext* cc) final {
+        LOG(ERROR) << "PythonBackendCalculator::Process";
         py::gil_scoped_acquire acquire;
         try {
-            LOG(ERROR) << "PythonBackendCalculator::Process";
             py::print("PYTHON: Acquired GIL");
             std::vector<py::object> pyInputs;
             for (const std::string& tag : cc->Inputs().GetTags()) {
                 LOG(ERROR) << tag;
-                const OvmsPyTensorPtr& pyTensor = cc->Inputs().Tag(tag).Get<OvmsPyTensorPtr>();
-                py::object pyInput = nodeResources->tensorClass->attr("create_from_data")(pyTensor->name, pyTensor->ptr, pyTensor->userShape, pyTensor->datatype, pyTensor->size);
-                pyInputs.push_back(pyInput);
+                //const py::object& pyTensor = cc->Inputs().Tag(tag).Get<PyObjectWrapper>().obj;
+                //pyInputs.push_back(pyTensor);
             }
            
             //py::list pyOutputs = nodeResources->nodeResourceObject->attr("execute")(pyInputs);
-            py::object pyOutput = nodeResources->nodeResourceObject->attr("execute")(pyInputs);
-            std::unique_ptr<OvmsPyTensorPtr> outputPtr = std::make_unique<OvmsPyTensorPtr>(
-                std::make_unique<OvmsPyTensor>(pyOutput.attr("name").cast<std::string>(), py::cast<py::buffer>(pyOutput.attr("ref_obj")))
-            );
-            cc->Outputs().Tag("OUTPUT").Add(outputPtr.release(), cc->InputTimestamp());
+            py::print("About to execute");
+            //py::object pyOutput = nodeResources->nodeResourceObject->attr("execute")(pyInputs);
+            //std::unique_ptr<PyObjectWrapper> outputPtr = std::make_unique<PyObjectWrapper>(std::move(pyOutput));
+            //cc->Outputs().Tag("OUTPUT").Add(outputPtr.release(), cc->InputTimestamp());
 
 /*
             for (const std::string& tag : cc->Outputs().GetTags()) {
@@ -105,7 +106,7 @@ public:
             */
             py::print("PYTHON: Released GIL");
         } catch (const pybind11::error_already_set& e) {
-            LOG(ERROR) << "PythonBackendCalculator::Process - Error: " << e.what();
+            LOG(ERROR) << "PythonBackendCalculator::Process - Py Error: " << e.what();
             return absl::NotFoundError("python error");
         } catch (std::exception& e) {
             LOG(ERROR) << "PythonBackendCalculator::Process - Error: " << e.what();

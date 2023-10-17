@@ -38,6 +38,7 @@ PYBIND11_MODULE(pyovms, m) {
         //    return OvmsPyTensor(name, buffer);
         //}, py::return_value_policy::reference))
         .def(py::init<std::string, const py::buffer&>())
+        .def_static("call", [](){py::print("Print from Tensor::call static method");})
         .def_static("create_from_data", [](const std::string& name, void* ptr, const std::vector<py::ssize_t>& shape, const std::string& datatype, py::ssize_t size) {
             return OvmsPyTensor(name, ptr, shape, datatype, size);
         })

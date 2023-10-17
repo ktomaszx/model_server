@@ -165,7 +165,8 @@ Status MediapipeGraphDefinition::validate(ModelManager& manager) {
 MediapipeGraphDefinition::MediapipeGraphDefinition(const std::string name,
     const MediapipeGraphConfig& config,
     MetricRegistry* registry,
-    const MetricConfig* metricConfig) :
+    const MetricConfig* metricConfig,
+    PythonBackend* pythonBackend) :
     name(name),
     status(SCHEDULER_CLASS_NAME, this->name) {
     mgconfig = config;
@@ -235,7 +236,7 @@ Status MediapipeGraphDefinition::create(std::shared_ptr<MediapipeGraphExecutor>&
     SPDLOG_DEBUG("Creating Mediapipe graph executor: {}", getName());
 
     pipeline = std::make_shared<MediapipeGraphExecutor>(getName(), std::to_string(getVersion()),
-        this->config, this->inputTypes, this->outputTypes, this->inputNames, this->outputNames, this->pythonNodeResources);
+        this->config, this->inputTypes, this->outputTypes, this->inputNames, this->outputNames, this->pythonNodeResources, this->pythonBackend);
     return status;
 }
 
@@ -448,7 +449,7 @@ Status MediapipeGraphDefinition::initializeNodes() {
             }
 
             std::shared_ptr<PythonNodeResource> nodeResource = nullptr;
-            Status status = PythonNodeResource::createPythonNodeResource(nodeResource, config.node(i).node_options(0));
+            Status status = PythonNodeResource::createPythonNodeResource(nodeResource, config.node(i).node_options(0), pythonBackend);
             if (nodeResource == nullptr || !status.ok()) {
                 SPDLOG_ERROR("Failed to process python node graph {}", this->name);
                 return status;

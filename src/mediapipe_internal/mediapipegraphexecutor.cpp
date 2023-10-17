@@ -61,6 +61,7 @@
 #if (PYTHON_DISABLE == 0)
 #include "../python/ovms_py_tensor.hpp"
 #include <pybind11/pybind11.h>
+#include <pybind11/embed.h>
 namespace py = pybind11;
 #endif
 
@@ -463,7 +464,7 @@ static Status deserializeTensor(const std::string& requestedName, const KFSReque
 typedef std::unique_ptr<OvmsPyTensor> OvmsPyTensorPtr;
 
 #if (PYTHON_DISABLE == 0)
-static Status deserializeTensor(const std::string& requestedName, const KFSRequest& request, std::unique_ptr<OvmsPyTensorPtr>& outTensor) {
+static Status deserializeTensor(const std::string& requestedName, const KFSRequest& request, std::unique_ptr<PyObjectWrapper>& outTensor, PythonBackend * pythonBackend) {
     auto requestInputItr = request.inputs().begin();
     auto status = getRequestInput(requestInputItr, requestedName, request);
     if (!status.ok()) {
@@ -484,14 +485,18 @@ static Status deserializeTensor(const std::string& requestedName, const KFSReque
             shape.push_back(requestInputItr->shape()[i]);
         }
 
-        outTensor = std::make_unique<OvmsPyTensorPtr>(
-            std::make_unique<OvmsPyTensor>(
-                requestedName, 
-                const_cast<void*>((const void*)bufferLocation.data()), 
-                shape, 
-                requestInputItr->datatype(), 
-                bufferLocation.size())
-            );
+        auto ok = pythonBackend->createOvmsPyTensor(
+            requestedName, 
+            const_cast<void*>((const void*)bufferLocation.data()), 
+            shape, 
+            requestInputItr->datatype(), 
+            bufferLocation.size(),
+            outTensor);
+        
+        if (!ok) {
+            SPDLOG_DEBUG("Error creating py tensor from data");
+            return StatusCode::UNKNOWN_ERROR;
+        }
     }
     HANDLE_DESERIALIZATION_EXCEPTION("Ovms Python tensor")
     return StatusCode::OK;
@@ -502,7 +507,8 @@ MediapipeGraphExecutor::MediapipeGraphExecutor(const std::string& name, const st
     stream_types_mapping_t inputTypes,
     stream_types_mapping_t outputTypes,
     std::vector<std::string> inputNames, std::vector<std::string> outputNames,
-    const std::unordered_map<std::string, std::shared_ptr<PythonNodeResource>>& pythonNodeResources) :
+    const std::unordered_map<std::string, std::shared_ptr<PythonNodeResource>>& pythonNodeResources,
+    PythonBackend* pythonBackend) :
     name(name),
     version(version),
     config(config),
@@ -510,7 +516,8 @@ MediapipeGraphExecutor::MediapipeGraphExecutor(const std::string& name, const st
     outputTypes(std::move(outputTypes)),
     inputNames(std::move(inputNames)),
     outputNames(std::move(outputNames)),
-    pythonNodeResources(pythonNodeResources) {}
+    pythonNodeResources(pythonNodeResources),
+    pythonBackend(pythonBackend) {}
 
 namespace {
 enum : unsigned int {
@@ -639,6 +646,49 @@ Status createPacketAndPushIntoGraph<KFSRequest*>(const std::string& name, const 
     SPDLOG_DEBUG("Request to passthrough:\"{}\"", name);
     auto absStatus = graph.AddPacketToInputStream(
         name, ::mediapipe::MakePacket<const KFSRequest*>(&request).At(::mediapipe::Timestamp(STARTING_TIMESTAMP)));
+    if (!absStatus.ok()) {
+        const std::string absMessage = absStatus.ToString();
+        SPDLOG_DEBUG("Failed to add stream: {} packet to mediapipe graph: {} with error: {}",
+            name, request.model_name(), absStatus.message(), absStatus.raw_code());
+        return Status(StatusCode::MEDIAPIPE_GRAPH_ADD_PACKET_INPUT_STREAM, std::move(absMessage));
+    }
+    absStatus = graph.CloseInputStream(name);
+    if (!absStatus.ok()) {
+        const std::string absMessage = absStatus.ToString();
+        SPDLOG_DEBUG("Failed to close stream: {} of mediapipe graph: {} with error: {}",
+            name, request.model_name(), absMessage);
+        return Status(StatusCode::MEDIAPIPE_GRAPH_CLOSE_INPUT_STREAM_ERROR, std::move(absMessage));
+    }
+    return StatusCode::OK;
+}
+
+template <typename T>
+static Status createPacketAndPushIntoGraphPython(const std::string& name, const KFSRequest& request, ::mediapipe::CalculatorGraph& graph, PythonBackend * pythonBackend) {
+    if (name.empty()) {
+        SPDLOG_DEBUG("Creating Mediapipe graph inputs name failed for: {}", name);
+        return StatusCode::MEDIAPIPE_GRAPH_ADD_PACKET_INPUT_STREAM;
+    }
+    SPDLOG_DEBUG("Tensor to deserialize:\"{}\"", name);
+    if (request.raw_input_contents().size() == 0) {
+        const std::string details = "Invalid message structure - raw_input_content is empty";
+        SPDLOG_DEBUG("[servable name: {} version: {}] {}", request.model_name(), request.model_version(), details);
+        return Status(StatusCode::INVALID_MESSAGE_STRUCTURE, details);
+    }
+    if (request.raw_input_contents().size() != request.inputs().size()) {
+        std::stringstream ss;
+        ss << "Size of raw_input_contents: " << request.raw_input_contents().size() << " is different than number of inputs: " << request.inputs().size();
+        const std::string details = ss.str();
+        SPDLOG_DEBUG("[servable name: {} version: {}] Invalid message structure - {}", request.model_name(), request.model_version(), details);
+        return Status(StatusCode::INVALID_MESSAGE_STRUCTURE, details);
+    }
+    std::unique_ptr<T> input_tensor;
+    auto status = deserializeTensor(name, request, input_tensor, pythonBackend);
+    if (!status.ok()) {
+        SPDLOG_DEBUG("Failed to deserialize tensor: {}", name);
+        return status;
+    }
+    auto absStatus = graph.AddPacketToInputStream(
+        name, ::mediapipe::Adopt<T>(input_tensor.release()).At(::mediapipe::Timestamp(STARTING_TIMESTAMP)));
     if (!absStatus.ok()) {
         const std::string absMessage = absStatus.ToString();
         SPDLOG_DEBUG("Failed to add stream: {} packet to mediapipe graph: {} with error: {}",
@@ -796,18 +846,33 @@ Status receiveAndSerializePacket<mediapipe::ImageFrame>(::mediapipe::Packet& pac
 }
 
 template <>
-Status receiveAndSerializePacket<OvmsPyTensorPtr>(::mediapipe::Packet& packet, KFSResponse& response, const std::string& outputStreamName) {
+Status receiveAndSerializePacket<PyObjectWrapper>(::mediapipe::Packet& packet, KFSResponse& response, const std::string& outputStreamName) {
+    py::gil_scoped_acquire acquire;
     try {
-        const OvmsPyTensorPtr& pyOutput = packet.Get<OvmsPyTensorPtr>();
+        const auto& pyOutput = packet.Get<PyObjectWrapper>();
+        SPDLOG_DEBUG("{} - {}", (void*)pyOutput.obj.ptr(), pyOutput.obj.ref_count());
+        auto a = pyOutput.obj.attr("name").cast<std::string>();
+        SPDLOG_DEBUG(bool(pyOutput.obj));
+        SPDLOG_DEBUG("receiveAndSerializePacket1");
+       // a = pyOutput.obj["name"];
+        SPDLOG_DEBUG("receiveAndSerializePacket2");
         auto* output = response.add_outputs();
-        output->set_name(pyOutput->name);
-        output->set_datatype(pyOutput->datatype);
+        output->set_name(pyOutput.obj.attr("name").cast<std::string>());
+        SPDLOG_DEBUG("receiveAndSerializePacket3");
+        output->set_datatype(pyOutput.obj["datatype"].cast<std::string>());
+        SPDLOG_DEBUG("receiveAndSerializePacket4");
         output->clear_shape();
-        for (const auto& dim : pyOutput->userShape) {
+        for (const auto& dim : pyOutput.obj["shape"].cast<std::vector<py::ssize_t>>()) {
             output->add_shape(dim);
         }
-        response.add_raw_output_contents()->assign(reinterpret_cast<char*>(pyOutput->ptr), pyOutput->size);
+        SPDLOG_DEBUG("receiveAndSerializePacket5");
+        void * ptr = pyOutput.obj["ptr"].cast<void*>();
+        response.add_raw_output_contents()->assign(reinterpret_cast<char*>(ptr), pyOutput.obj["size"].cast<py::ssize_t>());
+        SPDLOG_DEBUG("receiveAndSerializePacket6");
         return StatusCode::OK;
+    } catch (const pybind11::error_already_set& e) {
+        SPDLOG_DEBUG("Python error - {}", e.what());
+        return StatusCode::UNKNOWN_ERROR;
     }
     HANDLE_PACKET_RECEIVAL_EXCEPTIONS();
 }
@@ -888,7 +953,7 @@ Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* res
             status = createPacketAndPushIntoGraph<mediapipe::ImageFrame>(name, *request, graph);
         } else if (this->inputTypes.at(name) == mediapipe_packet_type_enum::OVMS_PY_TENSOR) {
             SPDLOG_DEBUG("Request processing OVMS Python input: {}", name);
-            status = createPacketAndPushIntoGraph<OvmsPyTensorPtr>(name, *request, graph);
+            status = createPacketAndPushIntoGraphPython<PyObjectWrapper>(name, *request, graph, pythonBackend);
         } else if ((this->inputTypes.at(name) == mediapipe_packet_type_enum::OVTENSOR) ||
                    (this->inputTypes.at(name) == mediapipe_packet_type_enum::UNKNOWN)) {
             SPDLOG_DEBUG("Request processing OVTensor: {}", name);
@@ -930,7 +995,7 @@ Status MediapipeGraphExecutor::infer(const KFSRequest* request, KFSResponse* res
                 status = receiveAndSerializePacket<mediapipe::ImageFrame>(packet, *response, outputStreamName);
             } else if (this->outputTypes.at(outputStreamName) == mediapipe_packet_type_enum::OVMS_PY_TENSOR) {
                 SPDLOG_DEBUG("Response processing Ovms Python tensor: {}", outputStreamName);
-                status = receiveAndSerializePacket<OvmsPyTensorPtr>(packet, *response, outputStreamName);
+                status = receiveAndSerializePacket<PyObjectWrapper>(packet, *response, outputStreamName);
             } else if ((this->outputTypes.at(outputStreamName) == mediapipe_packet_type_enum::OVTENSOR) ||
                        (this->outputTypes.at(outputStreamName) == mediapipe_packet_type_enum::UNKNOWN)) {
                 SPDLOG_DEBUG("Response processing packet type:  OVTensor name: {}", outputStreamName);

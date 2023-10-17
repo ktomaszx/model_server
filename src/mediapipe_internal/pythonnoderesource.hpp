@@ -27,6 +27,7 @@ namespace py = pybind11;
 
 namespace ovms {
 class Status;
+class PythonBackend;
 
 class PythonNodeResource {
 public:
@@ -34,13 +35,11 @@ public:
     PythonNodeResource& operator=(PythonNodeResource&) = delete;
 #if (PYTHON_DISABLE == 0)
     std::unique_ptr<py::object> nodeResourceObject;
-    std::unique_ptr<py::object> pyovmsModule;
-    std::unique_ptr<py::object> tensorClass;
+    PythonBackend * pythonBackend;
 
-    PythonNodeResource();
-    PythonNodeResource(const google::protobuf::Any& nodeOptions, Status& status);
+    PythonNodeResource(PythonBackend* pythonBackend);
     ~PythonNodeResource();
-    static Status createPythonNodeResource(std::shared_ptr<PythonNodeResource>& nodeResource, const google::protobuf::Any& nodeOptions);
+    static Status createPythonNodeResource(std::shared_ptr<PythonNodeResource>& nodeResource, const google::protobuf::Any& nodeOptions,  PythonBackend* pythonBackend);
 #endif
 };
 

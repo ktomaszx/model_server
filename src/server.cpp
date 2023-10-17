@@ -54,7 +54,9 @@
 #include "version.hpp"
 
 #if (PYTHON_DISABLE == 0)
+#include <pybind11/embed.h>  // everything needed for embedding
 #include "pythoninterpretermodule.hpp"
+namespace py = pybind11;
 #endif
 
 using grpc::ServerBuilder;
@@ -322,6 +324,7 @@ int Server::start(int argc, char** argv) {
     parser.parse(argc, argv);
     parser.prepare(&serverSettings, &modelsSettings);
     Status ret = start(&serverSettings, &modelsSettings);
+    py::gil_scoped_release release;
     ModulesShutdownGuard shutdownGuard(*this);
     if (!ret.ok()) {
         // Handle OVMS main() return code

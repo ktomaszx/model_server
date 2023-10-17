@@ -29,7 +29,7 @@ namespace py = pybind11;
 
 namespace ovms {
 
-PythonInterpreterModule::PythonInterpreterModule() {}
+PythonInterpreterModule::PythonInterpreterModule() {pythonBackend = nullptr;}
 
 Status PythonInterpreterModule::start(const ovms::Config& config) {
     state = ModuleState::STARTED_INITIALIZE;
@@ -41,7 +41,8 @@ Status PythonInterpreterModule::start(const ovms::Config& config) {
         print("Python version")
         print (sys.version)
     )");
-    py::gil_scoped_release release;  // GIL only needed in Python custom node
+    if(!PythonBackend::createPythonBackend(pythonBackend))
+        return StatusCode::INTERNAL_ERROR;
     state = ModuleState::INITIALIZED;
     SPDLOG_INFO("{} started", PYTHON_INTERPRETER_MODULE);
     return StatusCode::OK;
@@ -52,9 +53,15 @@ void PythonInterpreterModule::shutdown() {
         return;
     state = ModuleState::STARTED_SHUTDOWN;
     SPDLOG_INFO("{} shutting down", PYTHON_INTERPRETER_MODULE);
+    delete pythonBackend;
     py::finalize_interpreter();
     state = ModuleState::SHUTDOWN;
     SPDLOG_INFO("{} shutdown", PYTHON_INTERPRETER_MODULE);
+}
+
+
+PythonBackend* PythonInterpreterModule::getPythonBackend() const {
+    return pythonBackend;
 }
 
 PythonInterpreterModule::~PythonInterpreterModule() {
