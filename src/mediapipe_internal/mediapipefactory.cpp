@@ -37,7 +37,7 @@
 namespace ovms {
 
 MediapipeFactory::MediapipeFactory(PythonBackend* pythonBackend) {
-    pythonBackend = pythonBackend;
+    this->pythonBackend = pythonBackend;
 }
 Status MediapipeFactory::createDefinition(const std::string& pipelineName,
     const MediapipeGraphConfig& config,
@@ -46,6 +46,7 @@ Status MediapipeFactory::createDefinition(const std::string& pipelineName,
         SPDLOG_LOGGER_ERROR(modelmanager_logger, "Mediapipe graph definition: {} is already created", pipelineName);
         return StatusCode::PIPELINE_DEFINITION_ALREADY_EXIST;
     }
+    SPDLOG_INFO("UUUUUUUUUUUUUUUUUUUU ------ {}", (int64_t)pythonBackend);
     std::shared_ptr<MediapipeGraphDefinition> graphDefinition = std::make_shared<MediapipeGraphDefinition>(pipelineName, config, manager.getMetricRegistry(), &manager.getMetricConfig(), pythonBackend);
     auto stat = graphDefinition->validate(manager);
     if (stat.getCode() == StatusCode::MEDIAPIPE_GRAPH_NAME_OCCUPIED) {

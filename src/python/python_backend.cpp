@@ -2,6 +2,8 @@
 #include <iostream>
 #include <pybind11/stl.h>
 
+#include "../logging.hpp"
+
 namespace py = pybind11;
 using namespace py::literals;
 using namespace ovms;
@@ -49,11 +51,11 @@ T PyObjectWrapper::getProperty<T>(const std::string& name) {
 }
 */
 
-bool PythonBackend::createPythonBackend(PythonBackend* pythonBackend) {
+bool PythonBackend::createPythonBackend(PythonBackend** pythonBackend) {
     py::gil_scoped_acquire acquire;
     try {
-    pythonBackend = new PythonBackend();
-    std::cout << pythonBackend;
+    *pythonBackend = new PythonBackend();
+    SPDLOG_INFO("CREATED ------------------------ {}", (int64_t)*pythonBackend);
     } catch (const pybind11::error_already_set& e) {
         std::cout << "PythonBackend initialization failed: " << e.what() << std::endl;
         return false;

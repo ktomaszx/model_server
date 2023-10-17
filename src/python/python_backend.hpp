@@ -52,7 +52,7 @@ public:
     py::object tensorClass;
     PythonBackend();
     ~PythonBackend();
-    static bool createPythonBackend(PythonBackend* pythonBackend);
+    static bool createPythonBackend(PythonBackend** pythonBackend);
     bool createOvmsPyTensor(const std::string& name, void* ptr, const std::vector<py::ssize_t>& shape, const std::string& datatype, 
                                   py::ssize_t size, std::unique_ptr<PyObjectWrapper>& outTensor);
 

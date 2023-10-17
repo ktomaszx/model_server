@@ -42,9 +42,10 @@ class PythonBackend;
 class MediapipeFactory {
     std::map<std::string, std::shared_ptr<MediapipeGraphDefinition>> definitions;
     mutable std::shared_mutex definitionsMtx;
-    PythonBackend* pythonBackend;
+    PythonBackend* pythonBackend{nullptr};
 
 public:
+    MediapipeFactory() = delete;
     MediapipeFactory(PythonBackend* pythonBackend = nullptr);
     Status createDefinition(const std::string& pipelineName,
         const MediapipeGraphConfig& config,

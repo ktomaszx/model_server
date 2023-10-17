@@ -30,6 +30,7 @@ namespace ovms {
 ServableManagerModule::ServableManagerModule(ovms::Server& ovmsServer) {
     auto pythonModule = dynamic_cast<const PythonInterpreterModule*>(ovmsServer.getModule(PYTHON_INTERPRETER_MODULE));
     if (auto metricsModule = dynamic_cast<const MetricModule*>(ovmsServer.getModule(METRICS_MODULE_NAME))) {
+        SPDLOG_INFO("AAAAAAAAAAAA BBB------------ {}", (int64_t)pythonModule->getPythonBackend());
         this->servableManager = std::make_unique<ModelManager>("", &metricsModule->getRegistry(), pythonModule->getPythonBackend());
     } else {
         const char* message = "Tried to create servable manager module without metrics module";

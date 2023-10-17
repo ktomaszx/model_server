@@ -168,7 +168,8 @@ MediapipeGraphDefinition::MediapipeGraphDefinition(const std::string name,
     const MetricConfig* metricConfig,
     PythonBackend* pythonBackend) :
     name(name),
-    status(SCHEDULER_CLASS_NAME, this->name) {
+    status(SCHEDULER_CLASS_NAME, this->name),
+    pythonBackend(pythonBackend) {
     mgconfig = config;
     passKfsRequestFlag = false;
 }
@@ -235,6 +236,7 @@ Status MediapipeGraphDefinition::create(std::shared_ptr<MediapipeGraphExecutor>&
     }
     SPDLOG_DEBUG("Creating Mediapipe graph executor: {}", getName());
 
+    SPDLOG_INFO("FFFFFFFFFFFFFFFFFFFF ------ {}", (int64_t)this->pythonBackend);
     pipeline = std::make_shared<MediapipeGraphExecutor>(getName(), std::to_string(getVersion()),
         this->config, this->inputTypes, this->outputTypes, this->inputNames, this->outputNames, this->pythonNodeResources, this->pythonBackend);
     return status;

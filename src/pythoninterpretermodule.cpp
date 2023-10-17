@@ -41,8 +41,9 @@ Status PythonInterpreterModule::start(const ovms::Config& config) {
         print("Python version")
         print (sys.version)
     )");
-    if(!PythonBackend::createPythonBackend(pythonBackend))
+    if(!PythonBackend::createPythonBackend(&pythonBackend))
         return StatusCode::INTERNAL_ERROR;
+    SPDLOG_INFO("PYTHON_BACKEND_PTR: {}", (int64_t)pythonBackend);
     state = ModuleState::INITIALIZED;
     SPDLOG_INFO("{} started", PYTHON_INTERPRETER_MODULE);
     return StatusCode::OK;

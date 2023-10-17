@@ -485,6 +485,7 @@ static Status deserializeTensor(const std::string& requestedName, const KFSReque
             shape.push_back(requestInputItr->shape()[i]);
         }
 
+        SPDLOG_INFO("aaaaaaaaaaaaa -------------- {}", (int64_t)pythonBackend);
         auto ok = pythonBackend->createOvmsPyTensor(
             requestedName, 
             const_cast<void*>((const void*)bufferLocation.data()), 
