@@ -1171,6 +1171,39 @@ Status ModelInstance::performInference(ov::InferRequest& inferRequest) {
     return StatusCode::OK;
 }
 
+void fakeSerialize(ovms::InferenceResponse* responseProto) {
+}
+void fakeSerialize(tensorflow::serving::PredictResponse* responseProto) {
+}
+
+void fakeSerialize(KFSResponse* responseProto) {
+    static std::random_device rd;                            // obtain a random number from hardware
+    static std::mt19937 gen(rd());                           // seed the generator
+    static std::uniform_int_distribution<> distr(354, 396);  // define the range
+
+    auto findingsNumber = distr(gen);
+    responseProto->Clear();
+
+    auto* bs = responseProto->add_outputs();
+    bs->set_name("bs");
+    bs->mutable_shape()->Add(findingsNumber);
+    bs->set_datatype("INT64");
+    responseProto->add_raw_output_contents()->resize(sizeof(int64_t) * findingsNumber);
+
+    auto* scores = responseProto->add_outputs();
+    scores->set_name("scores");
+    scores->mutable_shape()->Add(findingsNumber);
+    scores->set_datatype("FP32");
+    responseProto->add_raw_output_contents()->resize(sizeof(float) * findingsNumber);
+
+    auto* boxes = responseProto->add_outputs();
+    boxes->set_name("bboxes");
+    boxes->mutable_shape()->Add(findingsNumber);
+    boxes->mutable_shape()->Add(4);
+    boxes->set_datatype("FP32");
+    responseProto->add_raw_output_contents()->resize(sizeof(float) * findingsNumber * 4);
+}
+
 template <typename RequestType, typename ResponseType>
 Status ModelInstance::infer(const RequestType* requestProto,
     ResponseType* responseProto,
@@ -1217,32 +1250,44 @@ Status ModelInstance::infer(const RequestType* requestProto,
     SPDLOG_DEBUG("Preprocessing duration in model {}, version {}, nireq {}: {:.3f} ms",
         getName(), getVersion(), executingInferId, timer.elapsed<microseconds>(PREPROCESS) / 1000);
 
-    timer.start(DESERIALIZE);
-    InputSink<ov::InferRequest&> inputSink(inferRequest);
-    bool isPipeline = false;
-    status = deserializePredictRequest<ConcreteTensorProtoDeserializator>(*requestProto, getInputsInfo(), inputSink, isPipeline);
-    timer.stop(DESERIALIZE);
-    if (!status.ok())
-        return status;
-    SPDLOG_DEBUG("Deserialization duration in model {}, version {}, nireq {}: {:.3f} ms",
-        getName(), getVersion(), executingInferId, timer.elapsed<microseconds>(DESERIALIZE) / 1000);
+    // timer.start(DESERIALIZE);
+    // InputSink<ov::InferRequest&> inputSink(inferRequest);
+    // bool isPipeline = false;
+    // status = deserializePredictRequest<ConcreteTensorProtoDeserializator>(*requestProto, getInputsInfo(), inputSink, isPipeline);
+    // timer.stop(DESERIALIZE);
+    // if (!status.ok())
+    //     return status;
+    // SPDLOG_DEBUG("Deserialization duration in model {}, version {}, nireq {}: {:.3f} ms",
+    //     getName(), getVersion(), executingInferId, timer.elapsed<microseconds>(DESERIALIZE) / 1000);
 
-    timer.start(PREDICTION);
-    status = performInference(inferRequest);
-    timer.stop(PREDICTION);
-    if (!status.ok())
-        return status;
-    SPDLOG_DEBUG("Prediction duration in model {}, version {}, nireq {}: {:.3f} ms",
-        getName(), getVersion(), executingInferId, timer.elapsed<microseconds>(PREDICTION) / 1000);
+    // timer.start(PREDICTION);
+    // status = performInference(inferRequest);
+    // timer.stop(PREDICTION);
+    // if (!status.ok())
+    //     return status;
+    // SPDLOG_DEBUG("Prediction duration in model {}, version {}, nireq {}: {:.3f} ms",
+    //     getName(), getVersion(), executingInferId, timer.elapsed<microseconds>(PREDICTION) / 1000);
 
-    timer.start(SERIALIZE);
-    OutputGetter<ov::InferRequest&> outputGetter(inferRequest);
-    status = serializePredictResponse(outputGetter, getName(), getVersion(), getOutputsInfo(), responseProto, getTensorInfoName, useSharedOutputContentFn(requestProto));
-    timer.stop(SERIALIZE);
-    if (!status.ok())
-        return status;
-    SPDLOG_DEBUG("Serialization duration in model {}, version {}, nireq {}: {:.3f} ms",
-        getName(), getVersion(), executingInferId, timer.elapsed<microseconds>(SERIALIZE) / 1000);
+    // timer.start(SERIALIZE);
+    // OutputGetter<ov::InferRequest&> outputGetter(inferRequest);
+    // status = serializePredictResponse(outputGetter, getName(), getVersion(), getOutputsInfo(), responseProto, getTensorInfoName, useSharedOutputContentFn(requestProto));
+    // timer.stop(SERIALIZE);
+    // if (!status.ok())
+    //     return status;
+    // SPDLOG_DEBUG("Serialization duration in model {}, version {}, nireq {}: {:.3f} ms",
+    //     getName(), getVersion(), executingInferId, timer.elapsed<microseconds>(SERIALIZE) / 1000);
+
+    // Fake serialize
+    /*
+
+    Out shapes: 354~396
+    (358, 4) (358,)
+    (359, 4) (359,)
+    (396, 4) (396,)
+    (354, 4) (354,)
+    (360, 4) (360,)
+    */
+    fakeSerialize(responseProto);
 
     timer.start(POSTPROCESS);
     status = requestProcessor->postInferenceProcessing(responseProto, inferRequest);
@@ -1258,12 +1303,14 @@ Status ModelInstance::infer(const RequestType* requestProto,
     status = requestProcessor->release();
     return status;
 }
+
 template Status ModelInstance::infer<tensorflow::serving::PredictRequest, tensorflow::serving::PredictResponse>(const tensorflow::serving::PredictRequest* requestProto,
     tensorflow::serving::PredictResponse* responseProto,
     std::unique_ptr<ModelInstanceUnloadGuard>& modelUnloadGuardPtr);
 template Status ModelInstance::infer(const ::KFSRequest* requestProto,
     ::KFSResponse* responseProto,
     std::unique_ptr<ModelInstanceUnloadGuard>& modelUnloadGuardPtr);
+
 const size_t ModelInstance::getBatchSizeIndex() const {
     const auto& inputItr = this->inputsInfo.cbegin();
     if (inputItr == this->inputsInfo.cend()) {

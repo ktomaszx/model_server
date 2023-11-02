@@ -17,6 +17,7 @@
 
 #include <iostream>
 #include <memory>
+#include <random>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -248,6 +249,7 @@ Status KFSInferenceServiceImpl::ModelMetadataImpl(::grpc::ServerContext* context
     SPDLOG_DEBUG("Processing gRPC request for model: {}; version: {}",
         request->model_name(),
         request->model_version());
+
     ServableMetricReporter* reporter = nullptr;
     Status status;
     const std::string servableName = request->model_name();
