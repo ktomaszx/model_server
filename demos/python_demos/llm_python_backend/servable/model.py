@@ -148,10 +148,11 @@ class OvmsPythonModel:
         partial_text = ""
         iteration = 0
         for new_text in streamer:
+            yield [Tensor("OUTPUT", new_text.encode())]
             partial_text = text_processor(partial_text, new_text)
             iteration += 1
             print('iteration', iteration)
         print('end')
 
-        return [Tensor("OUTPUT", partial_text.encode())]
+        #return [Tensor("OUTPUT", partial_text.encode())]
 

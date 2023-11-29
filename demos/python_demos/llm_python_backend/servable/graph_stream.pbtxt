@@ -1,0 +1,31 @@
+input_stream: "OVMS_PY_TENSOR:pre_prompt"
+output_stream: "OVMS_PY_TENSOR:completion"
+
+node {
+  name: "pythonNode"
+  calculator: "PythonExecutorCalculator"
+  input_side_packet: "PYTHON_NODE_RESOURCES:py"
+  input_stream: "loopback"
+  input_stream: "INPUT:pre_prompt"
+  input_stream_info: {
+    tag_index: ':0',
+    back_edge: true
+  }
+  input_stream_handler {
+    input_stream_handler: "SyncSetInputStreamHandler",
+    options {
+      [mediapipe.SyncSetInputStreamHandlerOptions.ext] {
+        sync_set {
+          tag_index: ":0"
+        }
+      }
+    }
+  }
+  output_stream: "loopback"
+  output_stream: "OUTPUT:completion"
+  node_options: {
+    [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
+      handler_path: "/workspace/model.py"
+    }
+  }
+}
