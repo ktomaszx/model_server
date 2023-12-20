@@ -61,7 +61,16 @@
 namespace py = pybind11;
 #endif
 
+#include "mediapipe/calculators/geti/inference/classification_calculator.h"
+#include "mediapipe/calculators/geti/serialization/serialization_calculators.h"
+#include "mediapipe/calculators/geti/utils/loop_calculators.h"
+
 namespace ovms {
+mediapipe::ClassificationCalculator classCalcInit;
+mediapipe::DetectionSerializationCalculator detserialize;
+mediapipe::BeginLoopModelApiDetectionCalculator loopbegin;
+mediapipe::EndLoopModelApiDetectionClassificationCalculator endloop;
+
 using ::mediapipe::Timestamp;
 const Timestamp DEFAULT_STARTING_STREAM_TIMESTAMP = Timestamp(0);
 
