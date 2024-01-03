@@ -1321,6 +1321,61 @@ TEST_F(PythonFlowTest, ReloadWithDifferentScriptName) {
     checkDummyResponse("output", data, req, res, 2 /* expect +2 */, 1, "mediaDummy");
 }
 
+TEST_F(PythonFlowTest, WrongBufferSize) {
+    ConstructorEnabledModelManager manager;
+    std::string firstTestPbtxt = R"(
+    input_stream: "OVMS_PY_TENSOR:input"
+    output_stream: "OVMS_PY_TENSOR:output"
+        node {
+            name: "pythonNode"
+            calculator: "PythonExecutorCalculator"
+            input_side_packet: "PYTHON_NODE_RESOURCES:py"
+            input_stream: "INPUT:input"
+            output_stream: "OUTPUT:output"
+            node_options: {
+                [type.googleapis.com / mediapipe.PythonExecutorCalculatorOptions]: {
+                    handler_path: "/ovms/src/test/mediapipe/python/scripts/symmetric_increment.py"
+                }
+            }
+        }
+    )";
+
+    ovms::MediapipeGraphConfig mgc{"mediaDummy", "", ""};
+    DummyMediapipeGraphDefinition mediapipeDummy("mediaDummy", mgc, firstTestPbtxt, getPythonBackend());
+    mediapipeDummy.inputConfig = firstTestPbtxt;
+    ASSERT_EQ(mediapipeDummy.validate(manager), StatusCode::OK);
+
+    std::shared_ptr<MediapipeGraphExecutor> pipeline;
+    ASSERT_EQ(mediapipeDummy.create(pipeline, nullptr, nullptr), StatusCode::OK);
+    ASSERT_NE(pipeline, nullptr);
+
+    KFSRequest req;
+    KFSResponse res;
+
+    //const std::vector<float> data{1.0f};//, 20.0f, 3.0f, 1.0f, 20.0f, 3.0f, 1.0f, 20.0f, 3.0f};//, -5.0f};
+    const std::vector<float> data{1.0f, 20.0f, 3.0f, 1.0f, 20.0f, 3.0f, 1.0f, 20.0f, 3.0f, -5.0f};
+    const std::vector<float> data2{1.0f, 20.0f, 3.0f, 1.0f, 20.0f, 3.0f, 1.0f, 20.0f, 3.0f, -5.0f};
+    req.set_model_name("mediaDummy");
+    prepareKFSInferInputTensor(req, "input", std::tuple<ovms::signed_shape_t, const ovms::Precision>{{1, 10/*DUMMY_MODEL_OUTPUT_SIZE*/}, ovms::fromString("FP32")}, data, false);
+
+
+    auto& a = *req.mutable_inputs()->begin();
+    (void)a;
+    a.clear_shape();
+    a.add_shape(1);
+    a.add_shape(100);
+
+    // a.add_shape(2);
+    //auto* ct = req.mutable_raw_input_contents()->Mutable(0);
+    //(void)ct;
+    //ct->resize(sizeof(float) * 9);
+
+    ServableMetricReporter* smr{nullptr};
+    ASSERT_EQ(pipeline->infer(&req, &res, this->defaultExecutionContext, smr), StatusCode::OK);
+
+    //checkDummyResponse("output", data2, req, res, 1 /* expect +1 */, 1, "mediaDummy");
+}
+
 TEST_F(PythonFlowTest, FailingToInitializeOneNodeDestructsAllResources) {
     ConstructorEnabledModelManager manager;
     std::string firstTestPbtxt = R"(

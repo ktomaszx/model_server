@@ -194,11 +194,15 @@ public:
                 // If execute yields, first request sets initial timestamp to input timestamp, then each cycle increments it.
                 // If execute returns, input timestamp is also output timestamp.
                 outputTimestamp = cc->InputTimestamp();
-
+                LOG(ERROR) << "AAAAAAAAAAAAAa";
                 std::vector<py::object> pyInputs;
+                LOG(ERROR) << "BBBBBBBBBBBB";
                 prepareInputs(cc, &pyInputs);
+                LOG(ERROR) << "CCCCCCCCCCCCCCC";
                 py::object executeResult = std::move(nodeResources->ovmsPythonModel->attr("execute")(pyInputs));
+                LOG(ERROR) << "DDDDDDDDDDDd";
                 handleExecutionResult(cc, executeResult);
+                LOG(ERROR) << "EEEEEEEEEEEEE";
             }
         } catch (const UnexpectedPythonObjectError& e) {
             // TODO: maybe some more descriptive information where to seek the issue.
