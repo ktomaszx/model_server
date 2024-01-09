@@ -15,8 +15,10 @@
 //*****************************************************************************
 #include <unordered_map>
 
-#include "../python/ovms_py_tensor.hpp"
-#include "../python/pythonnoderesources.hpp"
+// #include "../python/ovms_py_tensor.hpp"
+#include "ovms_py_tensor.hpp"
+//#include "../python/pythonnoderesources.hpp"
+#include "pythonnoderesources.hpp"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -26,8 +28,9 @@
 #include <pybind11/embed.h>  // everything needed for embedding
 #include <pybind11/stl.h>
 
-#include "../mediapipe_internal/mediapipegraphdefinition.hpp"
-#include "../python/python_backend.hpp"
+//#include "../mediapipe_internal/mediapipegraphdefinition.hpp"
+//#include "../python/python_backend.hpp"
+#include "python_backend.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;

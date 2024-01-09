@@ -20,8 +20,8 @@
 #include <unordered_map>
 
 #include <pybind11/embed.h>  // everything needed for embedding
-
-#include "src/mediapipe_calculators/python_executor_calculator_options.pb.h"
+// TODO fix include path
+#include "src/python/python_executor_calculator_options.pb.h"
 
 namespace py = pybind11;
 
@@ -47,5 +47,5 @@ public:
 private:
     static py::dict preparePythonNodeInitializeArguments(const ::mediapipe::CalculatorGraphConfig::Node& graphNodeConfig);
 };
-
+using PythonNodeResourcesMap = std::unordered_map<std::string, std::shared_ptr<PythonNodeResources>>;
 }  // namespace ovms

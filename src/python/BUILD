@@ -15,13 +15,32 @@
 #
 
 load("//src:common_settings.bzl", "COMMON_STATIC_LIBS_COPTS", "COMMON_STATIC_LIBS_LINKOPTS", "COMMON_FUZZER_COPTS", "COMMON_FUZZER_LINKOPTS")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+load("@mediapipe//mediapipe/framework/port:build_config.bzl", "mediapipe_cc_proto_library", "mediapipe_proto_library")
+
+pybind_extension(
+    name = "pyovms",
+    srcs = ["ovms_py_tensor_py.cpp", # TODO consider naming
+            "ovms_py_tensor.hpp",
+            "ovms_py_tensor.cpp"],
+    visibility = ["//visibility:public"],
+)
+
+mediapipe_proto_library(
+    name = "pythonexecutorcalculatoroptions_proto", # pythonexecutorcalculatoroptions_cc_proto - just mediapipe stuff with mediapipe_proto_library adding nonvisible target
+    srcs = ["python_executor_calculator_options.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mediapipe//mediapipe/framework:calculator_options_proto",
+        "@mediapipe//mediapipe/framework:calculator_proto",
+    ],
+)
 
 cc_library(
     name = "libovmspythonmodule",
     hdrs = ["pythonnoderesources.hpp",
             "ovms_py_tensor.hpp",
             "python_backend.hpp",
-            "pythonnoderesources.hpp",
             "pythoninterpretermodule.hpp",
             ],
     srcs = ["python_backend.cpp",
@@ -32,8 +51,14 @@ cc_library(
             "python_executor_calculator.cc",
             ],
     deps = [
-        "//src:logging",
-        "@com_github_glog_glog//:glog", # used to manage Mediapipe logging
+        "pythonexecutorcalculatoroptions_cc_proto",
+        "@com_github_grpc_grpc//:grpc++", # TODO find <google/protobuf/port_def.inc>
+        "@python3_linux//:python3-lib",
+        "@pybind11//:pybind11_embed",
+        "@mediapipe//mediapipe/framework:calculator_framework", # TODO only for calculator
+        "//src:cpp_headers", # TODO make ovmslib depend on that
+        "//src:libovmslogging",
+        "//src:libovmsmediapipe_utils"
     ],
     copts = COMMON_STATIC_LIBS_COPTS + select({
             "//conditions:default": [],
@@ -47,4 +72,5 @@ cc_library(
         "//src:fuzzer_build" : COMMON_FUZZER_LINKOPTS,
     }),
     alwayslink = 1,
+    data = [":pyovms.so"],
 )
